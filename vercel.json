@@ -1,15 +1,8 @@
 {
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/$1" }
-  ],
-  "headers": [
-    {
-      "source": "/style.css",
-      "headers": [{ "key": "Content-Type", "value": "text/css; charset=utf-8" }]
-    },
-    {
-      "source": "/app.js",
-      "headers": [{ "key": "Content-Type", "value": "application/javascript; charset=utf-8" }]
-    }
+  "version": 2,
+  "builds": [
+    { "src": "*.html", "use": "@vercel/static" },
+    { "src": "*.css", "use": "@vercel/static" },
+    { "src": "*.js", "use": "@vercel/static" }
   ]
 }
