@@ -1,8 +1,8 @@
 // =============================================
 // GANTI DENGAN NILAI DARI SUPABASE KAMU
 // =============================================
-const SUPABASE_URL = 'https://XXXX.supabase.co';
-const SUPABASE_KEY = 'ANON_PUBLIC_KEY_KAMU';
+const SUPABASE_URL = 'https://wwtzcbaxymdebwffrrud.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3dHpjYmF4eW1kZWJ3ZmZycnVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxMjIzODAsImV4cCI6MjA5MzY5ODM4MH0.CBS6QNCc9cBoNbnGLcJtEfGStJFS7uCtJsFosLsyF3k';
 // =============================================
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
