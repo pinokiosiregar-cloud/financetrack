@@ -15,6 +15,7 @@ let transactions=[];
 let currentType='pemasukan';
 let editId=null;
 let currentUser=null;
+let activePeriod='today';
 let lineChart=null,doughnutChart=null,catChart=null,inCatChart=null,invChart=null;
 
 // ========== UTILS ==========
@@ -47,7 +48,7 @@ async function handleRegister(){
   const {data,error}=await sb.auth.signUp({email,password:pass});
   if(error){msg.textContent=error.message;msg.style.display='block';return;}
   msg.style.color='#16a34a';
-  msg.textContent='Registrasi berhasil! Cek email untuk konfirmasi, lalu login.';
+  msg.textContent='Registrasi berhasil! Silakan login.';
   msg.style.display='block';
 }
 async function handleLogout(){
@@ -71,11 +72,11 @@ async function showApp(){
   await loadCategories();
   await loadTransactions();
   renderDashboard();
-  // Gain preview on input
   ['fBuyPrice','fCurPrice','fUnits'].forEach(id=>{
     document.getElementById(id).addEventListener('input',updateGainPreview);
   });
 }
+
 function updateGainPreview(){
   const buy=parseFloat(document.getElementById('fBuyPrice').value)||0;
   const cur=parseFloat(document.getElementById('fCurPrice').value)||0;
@@ -90,7 +91,7 @@ function updateGainPreview(){
   preview.style.display='block';
   preview.style.background=isGain?'#dcfce7':'#fee2e2';
   preview.style.color=isGain?'#15803d':'#b91c1c';
-  preview.innerHTML=`<strong>${isGain?'GAIN':'LOSS'}:</strong> ${isGain?'+':''}${fmt(gain)} (${isGain?'+':''}${pct}%) &nbsp;|&nbsp; Modal: ${fmt(modal)} &nbsp;→&nbsp; Nilai kini: ${fmt(kini)}`;
+  preview.innerHTML=`<strong>${isGain?'GAIN':'LOSS'}:</strong> ${isGain?'+':''}${fmt(gain)} (${isGain?'+':''}${pct}%) &nbsp;|&nbsp; Modal: ${fmt(modal)} → Nilai kini: ${fmt(kini)}`;
 }
 
 // ========== LOAD DATA ==========
@@ -99,6 +100,7 @@ async function loadCategories(){
   if(data&&data.length>0){categories=data;}
   else{await seedCategories();}
 }
+
 async function seedCategories(){
   const defaults=[
     {type:'pemasukan',name:'Gaji',icon:'briefcase',color:'green'},
@@ -116,7 +118,7 @@ async function seedCategories(){
     {type:'pengeluaran',name:'Cicilan Pinjaman',icon:'credit-card',color:'red'},
     {type:'pengeluaran',name:'Kesehatan',icon:'heart-rate-monitor',color:'red'},
     {type:'pengeluaran',name:'Hiburan',icon:'device-gamepad-2',color:'purple'},
-    {type:'pengeluaran',name:'Game',icon:'playstation-circle',color:'blue'},
+    {type:'pengeluaran',name:'Game',icon:'device-gamepad-2',color:'blue'},
     {type:'pengeluaran',name:'Kirim ke Rumah',icon:'home-move',color:'green'},
     {type:'pengeluaran',name:'Cemilan',icon:'cookie',color:'amber'},
     {type:'pengeluaran',name:'Pendidikan',icon:'school',color:'blue'},
@@ -132,6 +134,7 @@ async function seedCategories(){
   const{data}=await sb.from('categories').insert(rows).select();
   if(data)categories=data;
 }
+
 async function loadTransactions(){
   const{data}=await sb.from('transactions').select('*').eq('user_id',currentUser.id).order('date',{ascending:false});
   transactions=data||[];
@@ -143,13 +146,33 @@ function showPage(name,el){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',transaksi:'Transaksi',investasi:'Investasi',laporan:'Laporan & Analisis',kategori:'Manajemen Kategori'};
+  const titles={dashboard:'Dashboard',transaksi:'Data Transaksi',investasi:'Investasi',laporan:'Laporan & Analisis',kategori:'Data Kategori'};
   document.getElementById('pageTitle').textContent=titles[name]||name;
   if(name==='dashboard')renderDashboard();
   if(name==='transaksi')renderTables();
   if(name==='investasi')renderInvest();
   if(name==='laporan')renderLaporan();
   if(name==='kategori')renderCategories();
+}
+
+// ========== PERIOD ==========
+function setPeriod(p){
+  activePeriod=p;
+  document.querySelectorAll('.period-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('ptab-'+p).classList.add('active');
+  renderDashboard();
+}
+function filterByPeriod(list){
+  const now=new Date();
+  const todayStr=now.toISOString().split('T')[0];
+  const monthStr=todayStr.slice(0,7);
+  const yearStr=todayStr.slice(0,4);
+  return list.filter(t=>{
+    if(activePeriod==='today')return t.date===todayStr;
+    if(activePeriod==='month')return t.date.startsWith(monthStr);
+    if(activePeriod==='year')return t.date.startsWith(yearStr);
+    return true;
+  });
 }
 
 // ========== MODAL ==========
@@ -164,14 +187,17 @@ function openModal(id=null){
     document.getElementById('fNote').value=t.note||'';
     document.getElementById('fCat').value=t.cat_id;
     if(t.type==='investasi'){
+      document.getElementById('fTicker').value=t.ticker||'';
       document.getElementById('fBuyPrice').value=t.buy_price||0;
       document.getElementById('fCurPrice').value=t.cur_price||0;
       document.getElementById('fUnits').value=t.units||1;
+      updateGainPreview();
     }
     document.getElementById('modalTitleText').textContent='Edit Transaksi';
   } else {
     setType('pemasukan');
-    ['fAmount','fDesc','fNote','fBuyPrice','fCurPrice','fUnits'].forEach(id=>document.getElementById(id).value='');
+    ['fAmount','fDesc','fNote','fTicker','fBuyPrice','fCurPrice','fUnits'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('gainPreview').style.display='none';
     document.getElementById('fDate').value=today();
     document.getElementById('modalTitleText').textContent='Tambah Transaksi';
   }
@@ -186,6 +212,7 @@ function setType(t){
     el.className='type-tab'+(t===x?' active-'+x:'');
   });
   document.getElementById('investExtra').style.display=t==='investasi'?'block':'none';
+  document.getElementById('gainPreview').style.display='none';
   const sel=document.getElementById('fCat');
   sel.innerHTML='';
   categories.filter(c=>c.type===t).forEach(c=>{
@@ -202,6 +229,7 @@ async function saveTransaction(){
   if(!amount||!date||!description){alert('Lengkapi data terlebih dahulu!');return;}
   const obj={type:currentType,amount,date,description,cat_id,note,user_id:currentUser.id};
   if(currentType==='investasi'){
+    obj.ticker=document.getElementById('fTicker').value.trim().toUpperCase();
     obj.buy_price=parseFloat(document.getElementById('fBuyPrice').value)||0;
     obj.cur_price=parseFloat(document.getElementById('fCurPrice').value)||0;
     obj.units=parseFloat(document.getElementById('fUnits').value)||1;
@@ -224,25 +252,6 @@ async function deleteTransaction(id){
 }
 
 // ========== DASHBOARD ==========
-let activePeriod='all';
-function setPeriod(p){
-  activePeriod=p;
-  document.querySelectorAll('.period-tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('ptab-'+p).classList.add('active');
-  renderDashboard();
-}
-function filterByPeriod(list){
-  const now=new Date();
-  const todayStr=now.toISOString().split('T')[0];
-  const monthStr=todayStr.slice(0,7);
-  const yearStr=todayStr.slice(0,4);
-  return list.filter(t=>{
-    if(activePeriod==='today')return t.date===todayStr;
-    if(activePeriod==='month')return t.date.startsWith(monthStr);
-    if(activePeriod==='year')return t.date.startsWith(yearStr);
-    return true;
-  });
-}
 function renderDashboard(){
   const filtered=filterByPeriod(transactions);
   const ins=filtered.filter(t=>t.type==='pemasukan');
@@ -252,25 +261,24 @@ function renderDashboard(){
   const sumOut=outs.reduce((a,t)=>a+Number(t.amount),0);
   const sumInv=invs.reduce((a,t)=>a+Number(t.amount),0);
   const bal=sumIn-sumOut;
-  const periodLabel=activePeriod==='today'?'Hari Ini':activePeriod==='month'?'Bulan Ini':activePeriod==='year'?'Tahun Ini':'Semua';
   const now=new Date();
-  const periodSub=activePeriod==='today'?now.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):activePeriod==='month'?now.toLocaleDateString('id-ID',{month:'long'}):activePeriod==='year'?now.getFullYear().toString():'Semua Waktu';
+  const periodSub=activePeriod==='today'?now.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}):activePeriod==='month'?now.toLocaleDateString('id-ID',{month:'long',year:'numeric'}):activePeriod==='year'?now.getFullYear().toString():'Semua Waktu';
 
   document.getElementById('dashCards').innerHTML=`
     <div class="card card-grad grad-pink">
-      <div class="card-label"><i class="ti ti-arrow-down-circle"></i>Pemasukan ${periodLabel}</div>
+      <div class="card-label"><i class="ti ti-arrow-down-circle"></i>Total Pemasukan</div>
       <div class="card-value">${fmt(sumIn)}</div>
-      <div class="card-sub">${periodSub}</div>
+      <div class="card-sub">${periodSub} &nbsp;·&nbsp; ${ins.length} transaksi</div>
     </div>
     <div class="card card-grad grad-orange">
-      <div class="card-label"><i class="ti ti-arrow-up-circle"></i>Pengeluaran ${periodLabel}</div>
+      <div class="card-label"><i class="ti ti-arrow-up-circle"></i>Total Pengeluaran</div>
       <div class="card-value">${fmt(sumOut)}</div>
-      <div class="card-sub">${periodSub}</div>
+      <div class="card-sub">${periodSub} &nbsp;·&nbsp; ${outs.length} transaksi</div>
     </div>
     <div class="card card-grad grad-blue">
-      <div class="card-label"><i class="ti ti-building-bank"></i>Investasi ${periodLabel}</div>
+      <div class="card-label"><i class="ti ti-building-bank"></i>Total Investasi</div>
       <div class="card-value">${fmt(sumInv)}</div>
-      <div class="card-sub">${periodSub}</div>
+      <div class="card-sub">${periodSub} &nbsp;·&nbsp; ${invs.length} aset</div>
     </div>
     <div class="card card-grad ${bal>=0?'grad-teal':'grad-rose'}">
       <div class="card-label"><i class="ti ti-wallet"></i>Saldo Bersih</div>
@@ -278,6 +286,7 @@ function renderDashboard(){
       <div class="card-sub">${bal>=0?'Keuangan sehat ✓':'Pengeluaran > Pemasukan'}</div>
     </div>
   `;
+
   const recent=filtered.slice(0,5);
   const tb=document.getElementById('recentTbl');
   if(!recent.length){tb.innerHTML='<tr><td colspan="5"><div class="empty"><i class="ti ti-inbox"></i>Belum ada transaksi</div></td></tr>';}
@@ -288,7 +297,8 @@ function renderDashboard(){
     const sign=t.type==='pemasukan'?'+':t.type==='pengeluaran'?'-':'';
     return`<tr><td><div class="cat-row">${catIcon(c)}<span>${c?.name||'-'}</span></div></td><td>${t.description}</td><td style="color:var(--muted)">${t.date}</td><td><span class="badge ${badgeCls}">${t.type}</span></td><td class="${amtCls}" style="text-align:right">${sign}${fmt(t.amount)}</td></tr>`;
   }).join('');
-  buildLineChart();buildDoughnut(sumIn,sumOut,sumInv);
+  buildLineChart();
+  buildDoughnut(sumIn,sumOut,sumInv);
 }
 
 function buildLineChart(){
@@ -305,7 +315,7 @@ function buildLineChart(){
     data:{labels,datasets:[
       {label:'Pemasukan',data:labels.map(m=>(months[m]?.in||0)/1e6),borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,.08)',tension:.4,pointStyle:'circle'},
       {label:'Pengeluaran',data:labels.map(m=>(months[m]?.out||0)/1e6),borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,.08)',tension:.4,pointStyle:'triangle'},
-      {label:'Investasi',data:labels.map(m=>(months[m]?.inv||0)/1e6),borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.08)',tension:.4,pointStyle:'rect'},
+      {label:'Investasi',data:labels.map(m=>(months[m]?.inv||0)/1e6),borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.08)',tension:.4,pointStyle:'rect'},
     ]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{ticks:{callback:v=>v+'jt'}}}}
   });
@@ -314,7 +324,7 @@ function buildDoughnut(sumIn,sumOut,sumInv){
   if(doughnutChart)doughnutChart.destroy();
   doughnutChart=new Chart(document.getElementById('chartDoughnut'),{
     type:'doughnut',
-    data:{labels:['Pemasukan','Pengeluaran','Investasi'],datasets:[{data:[sumIn,sumOut,sumInv],backgroundColor:['#16a34a','#dc2626','#2563eb'],borderWidth:2}]},
+    data:{labels:['Pemasukan','Pengeluaran','Investasi'],datasets:[{data:[sumIn,sumOut,sumInv],backgroundColor:['#16a34a','#dc2626','#6366f1'],borderWidth:2}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}
   });
 }
@@ -337,7 +347,7 @@ function renderTables(){
     const badgeCls=t.type==='pemasukan'?'badge-green':t.type==='pengeluaran'?'badge-red':'badge-blue';
     const amtCls=t.type==='pemasukan'?'amt-in':t.type==='pengeluaran'?'amt-out':'amt-inv';
     const sign=t.type==='pemasukan'?'+':t.type==='pengeluaran'?'-':'';
-    return`<tr><td><div class="cat-row">${catIcon(c)}<span>${c?.name||'-'}</span></div></td><td>${t.description}</td><td style="color:var(--muted)">${t.date}</td><td><span class="badge ${badgeCls}">${t.type}</span></td><td style="color:var(--muted);font-size:12px">${t.note||'-'}</td><td class="${amtCls}" style="text-align:right">${sign}${fmt(t.amount)}</td><td><button class="btn btn-ghost btn-sm" onclick="openModal(${t.id})"><i class="ti ti-edit"></i></button><button class="btn btn-ghost btn-sm" onclick="deleteTransaction(${t.id})" style="color:var(--red)"><i class="ti ti-trash"></i></button></td></tr>`;
+    return`<tr><td><div class="cat-row">${catIcon(c)}<span>${c?.name||'-'}</span></div></td><td>${t.description}${t.ticker?` <span class="badge badge-blue">${t.ticker}</span>`:''}</td><td style="color:var(--muted)">${t.date}</td><td><span class="badge ${badgeCls}">${t.type}</span></td><td style="color:var(--muted);font-size:12px">${t.note||'-'}</td><td class="${amtCls}" style="text-align:right">${sign}${fmt(t.amount)}</td><td><button class="btn btn-ghost btn-sm" onclick="openModal(${t.id})"><i class="ti ti-edit"></i></button><button class="btn btn-ghost btn-sm" onclick="deleteTransaction(${t.id})" style="color:var(--red)"><i class="ti ti-trash"></i></button></td></tr>`;
   }).join('');
 }
 
@@ -350,17 +360,22 @@ function renderInvest(){
   const ret=totalModal?((gain/totalModal)*100).toFixed(2):0;
   document.getElementById('invModal').textContent=fmt(totalModal);
   document.getElementById('invGain').textContent=(gain>=0?'+':'')+fmt(gain);
-  document.getElementById('invGain').style.color=gain>=0?'#16a34a':'#dc2626';
   document.getElementById('invReturn').textContent=(ret>=0?'+':'')+ret+'%';
-  document.getElementById('invReturn').style.color=ret>=0?'#16a34a':'#dc2626';
   const tb=document.getElementById('invTbl');
-  if(!invs.length){tb.innerHTML='<tr><td colspan="5"><div class="empty"><i class="ti ti-inbox"></i>Belum ada investasi</div></td></tr>';return;}
+  if(!invs.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><i class="ti ti-inbox"></i>Belum ada investasi</div></td></tr>';return;}
   tb.innerHTML=invs.map(t=>{
     const c=getCat(t.cat_id);
     const kini=t.cur_price&&t.units?t.cur_price*t.units:Number(t.amount);
     const g=kini-Number(t.amount);
     const gPct=t.amount?((g/Number(t.amount))*100).toFixed(1):0;
-    return`<tr><td><div class="cat-row">${catIcon(c)}<span>${t.description}</span></div></td><td><span class="badge badge-blue">${c?.name||'-'}</span></td><td>${fmt(t.amount)}</td><td>${fmt(kini)}</td><td style="text-align:right"><span class="${g>=0?'gain-pos':'gain-neg'}">${g>=0?'+':''}${fmt(g)}<br><small>${gPct}%</small></span></td></tr>`;
+    return`<tr>
+      <td><div class="cat-row">${catIcon(c)}<span>${t.description}</span></div></td>
+      <td>${t.ticker?`<span class="badge badge-blue">${t.ticker}</span>`:'-'}</td>
+      <td><span class="badge badge-blue">${c?.name||'-'}</span></td>
+      <td>${fmt(t.amount)}</td>
+      <td>${fmt(kini)}</td>
+      <td style="text-align:right"><span class="${g>=0?'gain-pos':'gain-neg'}">${g>=0?'+':''}${fmt(g)}<br><small>${gPct}%</small></span></td>
+    </tr>`;
   }).join('');
   const catMap={};
   invs.forEach(t=>{const c=getCat(t.cat_id);const nm=c?c.name:'Lain';catMap[nm]=(catMap[nm]||0)+Number(t.amount);});
