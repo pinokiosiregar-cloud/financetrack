@@ -1,8 +1,8 @@
 // =============================================
 // GANTI DENGAN NILAI DARI SUPABASE KAMU
 // =============================================
-const SUPABASE_URL = 'https://wwtzcbaxymdebwffrrud.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3dHpjYmF4eW1kZWJ3ZmZycnVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxMjIzODAsImV4cCI6MjA5MzY5ODM4MH0.CBS6QNCc9cBoNbnGLcJtEfGStJFS7uCtJsFosLsyF3k';
+const SUPABASE_URL = 'https://XXXX.supabase.co';
+const SUPABASE_KEY = 'ANON_PUBLIC_KEY_KAMU';
 // =============================================
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -62,12 +62,35 @@ function showLogin(){document.getElementById('registerForm').style.display='none
 async function showApp(){
   document.getElementById('loginPage').style.display='none';
   document.getElementById('appPage').style.display='flex';
-  document.getElementById('userEmail').textContent=currentUser.email;
+  const email=currentUser.email;
+  document.getElementById('userEmail').textContent=email;
+  document.getElementById('userAvatar').textContent=email[0].toUpperCase();
+  document.getElementById('userName').textContent=email.split('@')[0];
   document.getElementById('currentDate').textContent=new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   document.getElementById('fDate').value=today();
   await loadCategories();
   await loadTransactions();
   renderDashboard();
+  // Gain preview on input
+  ['fBuyPrice','fCurPrice','fUnits'].forEach(id=>{
+    document.getElementById(id).addEventListener('input',updateGainPreview);
+  });
+}
+function updateGainPreview(){
+  const buy=parseFloat(document.getElementById('fBuyPrice').value)||0;
+  const cur=parseFloat(document.getElementById('fCurPrice').value)||0;
+  const units=parseFloat(document.getElementById('fUnits').value)||0;
+  const preview=document.getElementById('gainPreview');
+  if(!buy||!cur||!units){preview.style.display='none';return;}
+  const modal=buy*units;
+  const kini=cur*units;
+  const gain=kini-modal;
+  const pct=((gain/modal)*100).toFixed(2);
+  const isGain=gain>=0;
+  preview.style.display='block';
+  preview.style.background=isGain?'#dcfce7':'#fee2e2';
+  preview.style.color=isGain?'#15803d':'#b91c1c';
+  preview.innerHTML=`<strong>${isGain?'GAIN':'LOSS'}:</strong> ${isGain?'+':''}${fmt(gain)} (${isGain?'+':''}${pct}%) &nbsp;|&nbsp; Modal: ${fmt(modal)} &nbsp;→&nbsp; Nilai kini: ${fmt(kini)}`;
 }
 
 // ========== LOAD DATA ==========
@@ -81,6 +104,7 @@ async function seedCategories(){
     {type:'pemasukan',name:'Gaji',icon:'briefcase',color:'green'},
     {type:'pemasukan',name:'Freelance',icon:'laptop',color:'blue'},
     {type:'pemasukan',name:'Bonus',icon:'gift',color:'amber'},
+    {type:'pemasukan',name:'Honor',icon:'award',color:'purple'},
     {type:'pemasukan',name:'Dividen',icon:'chart-line',color:'purple'},
     {type:'pemasukan',name:'Sewa',icon:'home',color:'green'},
     {type:'pemasukan',name:'Bisnis',icon:'building-store',color:'blue'},
@@ -88,8 +112,13 @@ async function seedCategories(){
     {type:'pengeluaran',name:'Transport',icon:'car',color:'blue'},
     {type:'pengeluaran',name:'Tagihan',icon:'file-invoice',color:'red'},
     {type:'pengeluaran',name:'Belanja',icon:'shopping-cart',color:'purple'},
+    {type:'pengeluaran',name:'Pakaian',icon:'shirt',color:'purple'},
+    {type:'pengeluaran',name:'Cicilan Pinjaman',icon:'credit-card',color:'red'},
     {type:'pengeluaran',name:'Kesehatan',icon:'heart-rate-monitor',color:'red'},
     {type:'pengeluaran',name:'Hiburan',icon:'device-gamepad-2',color:'purple'},
+    {type:'pengeluaran',name:'Game',icon:'playstation-circle',color:'blue'},
+    {type:'pengeluaran',name:'Kirim ke Rumah',icon:'home-move',color:'green'},
+    {type:'pengeluaran',name:'Cemilan',icon:'cookie',color:'amber'},
     {type:'pengeluaran',name:'Pendidikan',icon:'school',color:'blue'},
     {type:'pengeluaran',name:'Lainnya',icon:'dots-circle-horizontal',color:'amber'},
     {type:'investasi',name:'Saham',icon:'chart-candle',color:'blue'},
@@ -195,27 +224,64 @@ async function deleteTransaction(id){
 }
 
 // ========== DASHBOARD ==========
+let activePeriod='all';
+function setPeriod(p){
+  activePeriod=p;
+  document.querySelectorAll('.period-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('ptab-'+p).classList.add('active');
+  renderDashboard();
+}
+function filterByPeriod(list){
+  const now=new Date();
+  const todayStr=now.toISOString().split('T')[0];
+  const monthStr=todayStr.slice(0,7);
+  const yearStr=todayStr.slice(0,4);
+  return list.filter(t=>{
+    if(activePeriod==='today')return t.date===todayStr;
+    if(activePeriod==='month')return t.date.startsWith(monthStr);
+    if(activePeriod==='year')return t.date.startsWith(yearStr);
+    return true;
+  });
+}
 function renderDashboard(){
-  const ins=transactions.filter(t=>t.type==='pemasukan');
-  const outs=transactions.filter(t=>t.type==='pengeluaran');
-  const invs=transactions.filter(t=>t.type==='investasi');
+  const filtered=filterByPeriod(transactions);
+  const ins=filtered.filter(t=>t.type==='pemasukan');
+  const outs=filtered.filter(t=>t.type==='pengeluaran');
+  const invs=filtered.filter(t=>t.type==='investasi');
   const sumIn=ins.reduce((a,t)=>a+Number(t.amount),0);
   const sumOut=outs.reduce((a,t)=>a+Number(t.amount),0);
   const sumInv=invs.reduce((a,t)=>a+Number(t.amount),0);
   const bal=sumIn-sumOut;
-  document.getElementById('totalIn').textContent=fmt(sumIn);
-  document.getElementById('totalOut').textContent=fmt(sumOut);
-  document.getElementById('totalInv').textContent=fmt(sumInv);
-  document.getElementById('totalBal').textContent=fmt(bal);
-  document.getElementById('countIn').textContent=ins.length+' transaksi';
-  document.getElementById('countOut').textContent=outs.length+' transaksi';
-  document.getElementById('countInv').textContent=invs.length+' aset';
-  document.getElementById('balStatus').textContent=bal>=0?'Keuangan sehat ✓':'Pengeluaran melebihi pemasukan';
-  document.getElementById('balStatus').style.color=bal>=0?'#16a34a':'#dc2626';
-  const recent=transactions.slice(0,5);
+  const periodLabel=activePeriod==='today'?'Hari Ini':activePeriod==='month'?'Bulan Ini':activePeriod==='year'?'Tahun Ini':'Semua';
+  const now=new Date();
+  const periodSub=activePeriod==='today'?now.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):activePeriod==='month'?now.toLocaleDateString('id-ID',{month:'long'}):activePeriod==='year'?now.getFullYear().toString():'Semua Waktu';
+
+  document.getElementById('dashCards').innerHTML=`
+    <div class="card card-grad grad-pink">
+      <div class="card-label"><i class="ti ti-arrow-down-circle"></i>Pemasukan ${periodLabel}</div>
+      <div class="card-value">${fmt(sumIn)}</div>
+      <div class="card-sub">${periodSub}</div>
+    </div>
+    <div class="card card-grad grad-orange">
+      <div class="card-label"><i class="ti ti-arrow-up-circle"></i>Pengeluaran ${periodLabel}</div>
+      <div class="card-value">${fmt(sumOut)}</div>
+      <div class="card-sub">${periodSub}</div>
+    </div>
+    <div class="card card-grad grad-blue">
+      <div class="card-label"><i class="ti ti-building-bank"></i>Investasi ${periodLabel}</div>
+      <div class="card-value">${fmt(sumInv)}</div>
+      <div class="card-sub">${periodSub}</div>
+    </div>
+    <div class="card card-grad ${bal>=0?'grad-teal':'grad-rose'}">
+      <div class="card-label"><i class="ti ti-wallet"></i>Saldo Bersih</div>
+      <div class="card-value">${fmt(bal)}</div>
+      <div class="card-sub">${bal>=0?'Keuangan sehat ✓':'Pengeluaran > Pemasukan'}</div>
+    </div>
+  `;
+  const recent=filtered.slice(0,5);
   const tb=document.getElementById('recentTbl');
-  if(!recent.length){tb.innerHTML='<tr><td colspan="5"><div class="empty"><i class="ti ti-inbox"></i>Belum ada transaksi</div></td></tr>';return;}
-  tb.innerHTML=recent.map(t=>{
+  if(!recent.length){tb.innerHTML='<tr><td colspan="5"><div class="empty"><i class="ti ti-inbox"></i>Belum ada transaksi</div></td></tr>';}
+  else tb.innerHTML=recent.map(t=>{
     const c=getCat(t.cat_id);
     const badgeCls=t.type==='pemasukan'?'badge-green':t.type==='pengeluaran'?'badge-red':'badge-blue';
     const amtCls=t.type==='pemasukan'?'amt-in':t.type==='pengeluaran'?'amt-out':'amt-inv';
