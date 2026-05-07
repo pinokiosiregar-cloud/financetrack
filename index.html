@@ -63,17 +63,20 @@
       <div class="logo-icon"><i class="ti ti-chart-pie"></i></div>
       <div><div class="logo-text">FinanceTrack</div><div class="logo-sub">Catatan Keuangan</div></div>
     </div>
+    <div class="user-info">
+      <div class="avatar" id="userAvatar">U</div>
+      <div><div class="uname" id="userName">Pengguna</div><div class="urole" id="userEmail">-</div></div>
+    </div>
     <nav class="nav">
       <div class="nav-section">Menu</div>
       <div class="nav-item active" onclick="showPage('dashboard',this)"><i class="ti ti-layout-dashboard"></i>Dashboard</div>
-      <div class="nav-item" onclick="showPage('transaksi',this)"><i class="ti ti-list"></i>Transaksi</div>
+      <div class="nav-item" onclick="showPage('transaksi',this)"><i class="ti ti-list"></i>Data Transaksi</div>
       <div class="nav-item" onclick="showPage('investasi',this)"><i class="ti ti-trending-up"></i>Investasi</div>
       <div class="nav-item" onclick="showPage('laporan',this)"><i class="ti ti-chart-bar"></i>Laporan</div>
       <div class="nav-section">Pengaturan</div>
-      <div class="nav-item" onclick="showPage('kategori',this)"><i class="ti ti-tag"></i>Kategori</div>
+      <div class="nav-item" onclick="showPage('kategori',this)"><i class="ti ti-tag"></i>Data Kategori</div>
     </nav>
     <div class="sidebar-footer">
-      <div id="userEmail" style="font-size:11px;color:#64748b;margin-bottom:8px;padding:0 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
       <div class="nav-item" onclick="handleLogout()" style="color:#ef4444"><i class="ti ti-logout"></i>Keluar</div>
     </div>
   </aside>
@@ -90,31 +93,16 @@
     <div class="content">
       <!-- DASHBOARD -->
       <div class="page active" id="page-dashboard">
-        <div class="cards-grid">
-          <div class="card card-green">
-            <div class="card-label"><i class="ti ti-arrow-down-circle"></i>Total Pemasukan</div>
-            <div class="card-value" id="totalIn">Rp 0</div>
-            <div class="card-sub" id="countIn">0 transaksi</div>
-          </div>
-          <div class="card card-red">
-            <div class="card-label"><i class="ti ti-arrow-up-circle"></i>Total Pengeluaran</div>
-            <div class="card-value" id="totalOut">Rp 0</div>
-            <div class="card-sub" id="countOut">0 transaksi</div>
-          </div>
-          <div class="card card-blue">
-            <div class="card-label"><i class="ti ti-building-bank"></i>Total Investasi</div>
-            <div class="card-value" id="totalInv">Rp 0</div>
-            <div class="card-sub" id="countInv">0 aset</div>
-          </div>
-          <div class="card card-purple">
-            <div class="card-label"><i class="ti ti-wallet"></i>Saldo Bersih</div>
-            <div class="card-value" id="totalBal">Rp 0</div>
-            <div class="card-sub" id="balStatus">Pemasukan - Pengeluaran</div>
-          </div>
+        <div class="period-tabs">
+          <div class="period-tab active" id="ptab-today" onclick="setPeriod('today')">Hari Ini</div>
+          <div class="period-tab" id="ptab-month" onclick="setPeriod('month')">Bulan Ini</div>
+          <div class="period-tab" id="ptab-year" onclick="setPeriod('year')">Tahun Ini</div>
+          <div class="period-tab" id="ptab-all" onclick="setPeriod('all')">Semua</div>
         </div>
+        <div class="cards-grid" id="dashCards"></div>
         <div class="grid-3">
           <div class="panel">
-            <div class="panel-header"><div class="panel-title"><i class="ti ti-chart-line" style="color:var(--blue)"></i> Arus Keuangan</div></div>
+            <div class="panel-header"><div class="panel-title"><i class="ti ti-chart-line" style="color:var(--blue)"></i> Grafik Keuangan Per Bulan</div></div>
             <div class="chart-wrap"><canvas id="chartLine" role="img" aria-label="Arus keuangan">Grafik</canvas></div>
           </div>
           <div class="panel">
@@ -245,20 +233,25 @@
       <input class="form-control" type="text" id="fDesc" placeholder="Deskripsi singkat...">
     </div>
     <div id="investExtra" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Kode Saham / Nama Kripto</label>
+        <input class="form-control" type="text" id="fTicker" placeholder="Contoh: BBCA / Bitcoin">
+      </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Harga Beli/unit</label>
+          <label class="form-label">Harga Beli/unit (Rp)</label>
           <input class="form-control" type="number" id="fBuyPrice" placeholder="0">
         </div>
         <div class="form-group">
-          <label class="form-label">Harga Kini/unit</label>
+          <label class="form-label">Harga Kini/unit (Rp)</label>
           <input class="form-control" type="number" id="fCurPrice" placeholder="0">
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Jumlah Unit/Lot</label>
+        <label class="form-label">Jumlah Unit / Lot / Koin</label>
         <input class="form-control" type="number" id="fUnits" placeholder="0">
       </div>
+      <div id="gainPreview" style="display:none;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:10px"></div>
     </div>
     <div class="form-group">
       <label class="form-label">Catatan (opsional)</label>
