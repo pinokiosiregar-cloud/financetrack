@@ -237,34 +237,72 @@ function checkObligasi(){
   }
 }
 
+function hitungObligasi(t, tglHitung=new Date()){
+  const nominal=t.nominal_per_unit||1000000;
+  const rate=t.kupon_rate||0;
+  const units=t.units||1;
+  const hargaBeli=t.buy_price||nominal;
+  const tglBeli=new Date(t.tgl_beli||t.date);
+  const tglJatuh=new Date(t.tgl_jatuh_tempo||t.date);
+  const tglKuponTerakhir=t.tgl_kupon_terakhir?new Date(t.tgl_kupon_terakhir):tglBeli;
+
+  const totalModal=hargaBeli*units;
+  const kuponHarian=(nominal*rate/100)/365;
+  const kuponHarianTotal=kuponHarian*units;
+
+  // Accrued interest (kupon penjual) = dari tgl kupon terakhir ke tgl beli
+  const hariAccrued=Math.max(0,Math.round((tglBeli-tglKuponTerakhir)/(1000*60*60*24)));
+  const kuponPenjual=kuponHarian*hariAccrued*units;
+
+  // Kupon berjalan = dari tgl beli ke hari ini
+  const hariBerjalan=Math.max(0,Math.round((tglHitung-tglBeli)/(1000*60*60*24)));
+  const kuponBerjalan=kuponHarianTotal*hariBerjalan;
+  const kuponBerjalanBersih=kuponBerjalan*0.9; // pajak 10%
+
+  // Total hari hingga jatuh tempo
+  const totalHari=Math.max(0,Math.round((tglJatuh-tglBeli)/(1000*60*60*24)));
+  const totalKuponKotor=kuponHarianTotal*totalHari;
+  const totalKuponBersih=totalKuponKotor*0.9;
+
+  // Yield rata-rata
+  const yield_=rate;
+
+  // Gain % berjalan
+  const gainPct=totalModal>0?((kuponBerjalanBersih/totalModal)*100).toFixed(2):0;
+
+  return{totalModal,kuponPenjual,kuponBerjalan:kuponBerjalanBersih,kuponHarian:kuponHarianTotal,totalKuponBersih,units,yield_,hariBerjalan,totalHari,gainPct};
+}
+
 function updateObligasiPreview(){
-  const nominal=parseFloat(document.getElementById('fNominal').value)||0;
   const rate=parseFloat(document.getElementById('fKuponRate').value)||0;
+  const nominalUnit=parseFloat(document.getElementById('fNominalUnit').value)||0;
+  const hargaBeli=parseFloat(document.getElementById('fHargaBeli').value)||0;
+  const jumlahUnit=parseFloat(document.getElementById('fJumlahUnit').value)||0;
   const tglBeli=document.getElementById('fTglBeli').value;
+  const tglKuponTerakhir=document.getElementById('fTglKuponTerakhir').value;
   const tglJatuh=document.getElementById('fTglJatuhTempo').value;
   const preview=document.getElementById('obligasiPreview');
-  if(!nominal||!rate||!tglBeli||!tglJatuh){preview.style.display='none';return;}
-  const beli=new Date(tglBeli);
-  const jatuh=new Date(tglJatuh);
-  const now=new Date();
-  const totalBulan=Math.max(0,Math.round((jatuh-beli)/(1000*60*60*24*30)));
-  const bulanBerjalan=Math.max(0,Math.min(Math.round((now-beli)/(1000*60*60*24*30)),totalBulan));
-  const kuponPerBulan=(nominal*rate/100)/12;
-  const totalKuponKotor=kuponPerBulan*totalBulan;
-  const kuponDiterima=kuponPerBulan*bulanBerjalan;
-  const pajak=totalKuponKotor*0.1;
-  const gainBersih=totalKuponKotor-pajak;
-  // auto isi amount
-  document.getElementById('fAmount').value=nominal;
+  if(!rate||!nominalUnit||!hargaBeli||!jumlahUnit||!tglBeli||!tglJatuh){preview.style.display='none';return;}
+
+  // Auto isi amount
+  document.getElementById('fAmount').value=hargaBeli*jumlahUnit;
+
+  const mock={
+    nominal_per_unit:nominalUnit,kupon_rate:rate,units:jumlahUnit,
+    buy_price:hargaBeli,tgl_beli:tglBeli,tgl_jatuh_tempo:tglJatuh,
+    tgl_kupon_terakhir:tglKuponTerakhir||tglBeli
+  };
+  const h=hitungObligasi(mock);
   preview.style.display='block';
   preview.innerHTML=`
     <strong>📋 Kalkulasi Obligasi:</strong><br>
-    Kupon/bulan (kotor): <b>${fmt(kuponPerBulan)}</b><br>
-    Total kupon s/d jatuh tempo: <b>${fmt(totalKuponKotor)}</b><br>
-    Pajak kupon (10%): <b>-${fmt(pajak)}</b><br>
-    <strong>Total gain bersih: ${fmt(gainBersih)}</strong><br>
-    Sudah berjalan: <b>${bulanBerjalan} bulan</b> dari ${totalBulan} bulan<br>
-    Kupon sudah diterima: <b>${fmt(kuponDiterima)}</b>
+    Total Modal Investasi: <b>${fmt(h.totalModal)}</b><br>
+    Total Kupon Penjual (accrued): <b>${fmt(h.kuponPenjual)}</b><br>
+    Total Kupon Berjalan (bersih): <b style="color:#16a34a">${fmt(h.kuponBerjalan)}</b><br>
+    Kupon Harian: <b>+${fmt(h.kuponHarian)}/hari</b><br>
+    Total Unit Obligasi: <b>${h.units} unit</b><br>
+    Yield Rata-rata: <b>${h.yield_}%</b><br>
+    Gain Berjalan: <b style="color:#16a34a">+${h.gainPct}% (${h.hariBerjalan} hari)</b>
   `;
 }
 
@@ -285,18 +323,13 @@ async function saveTransaction(){
     const selected=categories.find(c=>c.id==cat_id);
     if(selected&&selected.name.toLowerCase().includes('obligasi')){
       obj.kupon_rate=parseFloat(document.getElementById('fKuponRate').value)||0;
+      obj.nominal_per_unit=parseFloat(document.getElementById('fNominalUnit').value)||0;
       obj.tgl_beli=document.getElementById('fTglBeli').value||null;
       obj.tgl_jatuh_tempo=document.getElementById('fTglJatuhTempo').value||null;
-      // Hitung cur_price otomatis dari gain obligasi
-      const nominal=amount;
-      const rate=obj.kupon_rate;
-      const tglBeli=new Date(obj.tgl_beli);
-      const tglJatuh=new Date(obj.tgl_jatuh_tempo);
-      const totalBulan=Math.max(0,Math.round((tglJatuh-tglBeli)/(1000*60*60*24*30)));
-      const kuponPerBulan=(nominal*rate/100)/12;
-      const totalKuponBersih=kuponPerBulan*totalBulan*0.9;
-      obj.cur_price=nominal+totalKuponBersih;
-      obj.units=1;
+      obj.tgl_kupon_terakhir=document.getElementById('fTglKuponTerakhir').value||null;
+      obj.buy_price=parseFloat(document.getElementById('fHargaBeli').value)||0;
+      obj.units=parseFloat(document.getElementById('fJumlahUnit').value)||1;
+      obj.cur_price=obj.buy_price;
     }
   }
   if(editId){
@@ -419,31 +452,49 @@ function renderTables(){
 // ========== INVESTASI ==========
 function renderInvest(){
   const invs=transactions.filter(t=>t.type==='investasi');
-  const totalModal=invs.reduce((a,t)=>a+Number(t.amount),0);
-  const totalKini=invs.reduce((a,t)=>a+(t.cur_price&&t.units?t.cur_price*t.units:Number(t.amount)),0);
+  const now=new Date();
+
+  // Hitung nilai kini — obligasi pakai hitungObligasi, lainnya pakai cur_price
+  const rows=invs.map(t=>{
+    const c=getCat(t.cat_id);
+    const isObligasi=c&&c.name.toLowerCase().includes('obligasi');
+    if(isObligasi&&t.kupon_rate){
+      const h=hitungObligasi(t,now);
+      return{...t,_modal:h.totalModal,_kini:h.totalModal+h.kuponBerjalan,_gain:h.kuponBerjalan,_pct:h.gainPct,_detail:`Kupon berjalan ${h.hariBerjalan} hari | Yield ${h.yield_}%`,_units:h.units};
+    } else {
+      const modal=Number(t.amount);
+      const kini=t.cur_price&&t.units?t.cur_price*t.units:modal;
+      const gain=kini-modal;
+      const pct=modal?((gain/modal)*100).toFixed(1):0;
+      return{...t,_modal:modal,_kini:kini,_gain:gain,_pct:pct,_detail:t.ticker||'',_units:t.units||1};
+    }
+  });
+
+  const totalModal=rows.reduce((a,r)=>a+r._modal,0);
+  const totalKini=rows.reduce((a,r)=>a+r._kini,0);
   const gain=totalKini-totalModal;
   const ret=totalModal?((gain/totalModal)*100).toFixed(2):0;
+
   document.getElementById('invModal').textContent=fmt(totalModal);
   document.getElementById('invGain').textContent=(gain>=0?'+':'')+fmt(gain);
   document.getElementById('invReturn').textContent=(ret>=0?'+':'')+ret+'%';
+
   const tb=document.getElementById('invTbl');
-  if(!invs.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><i class="ti ti-inbox"></i>Belum ada investasi</div></td></tr>';return;}
-  tb.innerHTML=invs.map(t=>{
-    const c=getCat(t.cat_id);
-    const kini=t.cur_price&&t.units?t.cur_price*t.units:Number(t.amount);
-    const g=kini-Number(t.amount);
-    const gPct=t.amount?((g/Number(t.amount))*100).toFixed(1):0;
+  if(!rows.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><i class="ti ti-inbox"></i>Belum ada investasi</div></td></tr>';return;}
+  tb.innerHTML=rows.map(r=>{
+    const c=getCat(r.cat_id);
     return`<tr>
-      <td><div class="cat-row">${catIcon(c)}<span>${t.description}</span></div></td>
-      <td>${t.ticker?`<span class="badge badge-blue">${t.ticker}</span>`:'-'}</td>
+      <td><div class="cat-row">${catIcon(c)}<div><div>${r.description}</div><div style="font-size:11px;color:var(--muted)">${r._detail}</div></div></div></td>
+      <td>${r.ticker?`<span class="badge badge-blue">${r.ticker}</span>`:'-'}</td>
       <td><span class="badge badge-blue">${c?.name||'-'}</span></td>
-      <td>${fmt(t.amount)}</td>
-      <td>${fmt(kini)}</td>
-      <td style="text-align:right"><span class="${g>=0?'gain-pos':'gain-neg'}">${g>=0?'+':''}${fmt(g)}<br><small>${gPct}%</small></span></td>
+      <td>${fmt(r._modal)}</td>
+      <td>${fmt(r._kini)}</td>
+      <td style="text-align:right"><span class="${r._gain>=0?'gain-pos':'gain-neg'}">${r._gain>=0?'+':''}${fmt(r._gain)}<br><small>${r._pct}%</small></span></td>
     </tr>`;
   }).join('');
+
   const catMap={};
-  invs.forEach(t=>{const c=getCat(t.cat_id);const nm=c?c.name:'Lain';catMap[nm]=(catMap[nm]||0)+Number(t.amount);});
+  rows.forEach(r=>{const c=getCat(r.cat_id);const nm=c?c.name:'Lain';catMap[nm]=(catMap[nm]||0)+r._modal;});
   const lbls=Object.keys(catMap);
   if(invChart)invChart.destroy();
   invChart=new Chart(document.getElementById('chartInv'),{
