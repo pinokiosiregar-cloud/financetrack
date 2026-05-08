@@ -260,24 +260,40 @@
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Kupon Rate (% per tahun)</label>
-            <input class="form-control" type="number" id="fKuponRate" placeholder="cth: 6.25" step="0.01">
+            <input class="form-control" type="number" id="fKuponRate" placeholder="cth: 6.25" step="0.01" oninput="updateObligasiPreview()">
           </div>
           <div class="form-group">
-            <label class="form-label">Nilai Nominal (Rp)</label>
-            <input class="form-control" type="number" id="fNominal" placeholder="cth: 1000000">
+            <label class="form-label">Nominal per Unit (Rp)</label>
+            <input class="form-control" type="number" id="fNominalUnit" placeholder="cth: 1000000" oninput="updateObligasiPreview()">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Harga Beli per Unit (Rp)</label>
+            <input class="form-control" type="number" id="fHargaBeli" placeholder="cth: 1050000" oninput="updateObligasiPreview()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Jumlah Unit</label>
+            <input class="form-control" type="number" id="fJumlahUnit" placeholder="cth: 10" oninput="updateObligasiPreview()">
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Tanggal Beli</label>
-            <input class="form-control" type="date" id="fTglBeli">
+            <input class="form-control" type="date" id="fTglBeli" oninput="updateObligasiPreview()">
           </div>
           <div class="form-group">
-            <label class="form-label">Tanggal Jatuh Tempo</label>
-            <input class="form-control" type="date" id="fTglJatuhTempo">
+            <label class="form-label">Tanggal Kupon Terakhir</label>
+            <input class="form-control" type="date" id="fTglKuponTerakhir" oninput="updateObligasiPreview()">
           </div>
         </div>
-        <div id="obligasiPreview" style="display:none;padding:12px;border-radius:8px;background:#ede9fe;color:#6d28d9;font-size:13px;margin-bottom:10px"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Tanggal Jatuh Tempo</label>
+            <input class="form-control" type="date" id="fTglJatuhTempo" oninput="updateObligasiPreview()">
+          </div>
+        </div>
+        <div id="obligasiPreview" style="display:none;padding:12px;border-radius:8px;background:#ede9fe;color:#6d28d9;font-size:13px;margin-bottom:10px;line-height:1.8"></div>
       </div>
     </div>
     <div class="form-group">
