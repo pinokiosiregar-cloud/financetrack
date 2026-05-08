@@ -523,43 +523,23 @@ async function deleteTransaction(id){
   renderDashboard();renderTables();renderInvest();renderLaporan();
 }
 
-// ========== AI ANALYSIS ==========
-async function analyzeAsset(t){
-  const c=getCat(t.cat_id);
-  const modal=document.getElementById('analysisModalBg');
-  const content=document.getElementById('analysisContent');
-  const title=document.getElementById('analysisTitleText');
-  title.textContent=`Analisa AI — ${t.description}`;
-  content.textContent='⏳ Menganalisa...';
-  modal.classList.add('open');
+function analyzeAsset(t){
   const invType=getCatType(t.cat_id);
-  let prompt='';
+  let url='';
+
   if(invType==='saham'){
-    prompt=`Berikan analisa fundamental singkat dan saran investasi untuk saham ${t.kode_saham} (IDX). Sertakan: kondisi bisnis terkini, valuasi, risiko, dan rekomendasi (buy/hold/sell) dengan alasan singkat. Gunakan bahasa Indonesia.`;
+    url=`https://www.google.com/search?q=${t.kode_saham}+IDX+saham+analisa+fundamental`;
   } else if(invType==='crypto'){
-    prompt=`Berikan analisa singkat dan saran untuk ${t.description} (${t.coin_symbol}). Sertakan: tren harga terkini, sentimen pasar, risiko, dan rekomendasi. Gunakan bahasa Indonesia.`;
+    url=`https://www.google.com/search?q=${t.description}+${t.coin_symbol||''}+crypto+analisa+harga+terkini`;
   } else if(invType==='emas'){
-    prompt=`Berikan analisa singkat tren harga emas saat ini dan prospek ke depan. Sertakan faktor yang mempengaruhi harga emas dan saran untuk investor emas fisik. Gunakan bahasa Indonesia.`;
+    url=`https://www.google.com/search?q=harga+emas+hari+ini+analisa+investasi+emas`;
   } else if(invType==='obligasi'){
-    prompt=`Berikan analisa singkat untuk obligasi FR dengan yield ${t.kupon_rate}% jatuh tempo ${t.tgl_jatuh_tempo}. Sertakan analisa risiko suku bunga, prospek, dan apakah layak di-hold hingga jatuh tempo. Gunakan bahasa Indonesia.`;
+    url=`https://www.google.com/search?q=obligasi+FR+yield+${t.kupon_rate}+analisa+investasi`;
   } else {
-    prompt=`Berikan analisa singkat untuk investasi: ${t.description} senilai ${fmt(t.amount)}. Gunakan bahasa Indonesia.`;
+    url=`https://www.google.com/search?q=${encodeURIComponent(t.description)}+investasi+analisa`;
   }
-  try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
-        messages:[{role:'user',content:prompt}]
-      })
-    });
-    const d=await r.json();
-    content.textContent=d.content?.[0]?.text||'Tidak dapat menganalisa saat ini.';
-  }catch(e){
-    content.textContent='Error: Tidak dapat terhubung ke AI. Coba lagi nanti.';
-  }
+
+  window.open(url,'_blank');
 }
 
 // ========== DASHBOARD ==========
