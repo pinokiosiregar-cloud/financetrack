@@ -473,7 +473,8 @@ async function saveTransaction(){
   const description=document.getElementById('fDesc').value.trim();
   const cat_id=parseInt(document.getElementById('fCat').value);
   const note=document.getElementById('fNote').value.trim();
-  if(!amount||!date||!description){alert('Lengkapi data terlebih dahulu!');return;}
+  if(!amount||!date){alert('Lengkapi jumlah dan tanggal!');return;}
+  const desc=document.getElementById('fDesc').value.trim()||'-';
   const obj={type:currentType,amount,date,description,cat_id,note,user_id:currentUser.id};
   const invType=getCatType(cat_id);
   if(currentType==='investasi'){
@@ -604,6 +605,22 @@ function renderTables(){
     const ticker=t.kode_saham||t.coin_symbol?.toUpperCase()||'';
     return`<tr><td><div class="cat-row">${catIcon(c)}<span>${c?.name||'-'}</span></div></td><td>${t.description}${ticker?` <span class="badge badge-blue">${ticker}</span>`:''}</td><td style="color:var(--muted)">${t.date}</td><td><span class="badge ${badgeCls}">${t.type}</span></td><td style="color:var(--muted);font-size:12px">${t.note||'-'}</td><td class="${amtCls}" style="text-align:right">${sign}${fmt(t.amount)}</td><td><button class="btn btn-ghost btn-sm" onclick="openModal(${t.id})"><i class="ti ti-edit"></i></button><button class="btn btn-ghost btn-sm" onclick="deleteTransaction(${t.id})" style="color:var(--red)"><i class="ti ti-trash"></i></button></td></tr>`;
   }).join('');
+  // Hitung total
+  const totalIn=data.filter(t=>t.type==='pemasukan').reduce((a,t)=>a+Number(t.amount),0);
+  const totalOut=data.filter(t=>t.type==='pengeluaran').reduce((a,t)=>a+Number(t.amount),0);
+  const totalInv=data.filter(t=>t.type==='investasi').reduce((a,t)=>a+Number(t.amount),0);
+  const existing=document.getElementById('trxSummary');
+  if(existing)existing.remove();
+  const summary=document.createElement('div');
+  summary.id='trxSummary';
+  summary.style.cssText='display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap';
+  summary.innerHTML=`
+    <div style="background:#dcfce7;color:#15803d;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600">📥 Pemasukan: ${fmt(totalIn)}</div>
+    <div style="background:#fee2e2;color:#b91c1c;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600">📤 Pengeluaran: ${fmt(totalOut)}</div>
+    ${totalInv>0?`<div style="background:#dbeafe;color:#1d4ed8;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600">📈 Investasi: ${fmt(totalInv)}</div>`:''}
+    <div style="background:#ede9fe;color:#6d28d9;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600">💳 Saldo: ${fmt(totalIn-totalOut)}</div>
+`  ;
+  document.getElementById('page-transaksi').insertBefore(summary,document.querySelector('.panel'));
 }
 
 // ========== INVESTASI ==========
