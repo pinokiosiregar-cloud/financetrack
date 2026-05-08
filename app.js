@@ -739,3 +739,9 @@ async function deleteCategory(id){
 sb.auth.getSession().then(({data:{session}})=>{
   if(session){currentUser=session.user;showApp();}
 });
+
+// Update tanggal setiap menit
+setInterval(()=>{
+  const el=document.getElementById('currentDate');
+  if(el)el.textContent=new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+}, 60000);
