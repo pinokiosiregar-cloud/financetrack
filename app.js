@@ -214,13 +214,16 @@ function setPeriod(p){
 }
 function filterByPeriod(list){
   const now=new Date();
-  const todayStr=now.toISOString().split('T')[0];
+  const todayStr=now.getFullYear()+'-'+
+    String(now.getMonth()+1).padStart(2,'0')+'-'+
+    String(now.getDate()).padStart(2,'0');
   const monthStr=todayStr.slice(0,7);
   const yearStr=todayStr.slice(0,4);
   return list.filter(t=>{
-    if(activePeriod==='today')return t.date===todayStr;
-    if(activePeriod==='month')return t.date.startsWith(monthStr);
-    if(activePeriod==='year')return t.date.startsWith(yearStr);
+    const tDate=(t.date||'').slice(0,10);
+    if(activePeriod==='today')return tDate===todayStr;
+    if(activePeriod==='month')return tDate.startsWith(monthStr);
+    if(activePeriod==='year')return tDate.startsWith(yearStr);
     return true;
   });
 }
