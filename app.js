@@ -17,7 +17,12 @@ let selectedCoin=null,livePrices={};
 
 // ========== UTILS ==========
 const fmt=n=>'Rp '+Math.round(n).toLocaleString('id-ID');
-const today=()=>new Date().toISOString().split('T')[0];
+const today=()=>{
+  const now=new Date();
+  return now.getFullYear()+'-'+
+    String(now.getMonth()+1).padStart(2,'0')+'-'+
+    String(now.getDate()).padStart(2,'0');
+};
 const getCat=id=>categories.find(c=>c.id==id);
 function catColor(c){return COLORS[c?.color]||'#888'}
 function catBg(c){return LIGHT[c?.color]||'#eee'}
