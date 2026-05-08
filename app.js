@@ -71,7 +71,6 @@ async function showApp(){
   document.getElementById('userAvatar').textContent=email[0].toUpperCase();
   document.getElementById('userName').textContent=email.split('@')[0];
   document.getElementById('currentDate').textContent=new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  document.getElementById('fDate').value=today();
   await loadCategories();
   await loadTransactions();
   renderDashboard();
