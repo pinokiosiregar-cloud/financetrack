@@ -213,11 +213,59 @@ function setType(t){
   });
   document.getElementById('investExtra').style.display=t==='investasi'?'block':'none';
   document.getElementById('gainPreview').style.display='none';
+  document.getElementById('obligasiExtra').style.display='none';
   const sel=document.getElementById('fCat');
   sel.innerHTML='';
   categories.filter(c=>c.type===t).forEach(c=>{
     const o=document.createElement('option');o.value=c.id;o.textContent=c.name;sel.appendChild(o);
   });
+  if(t==='investasi'){
+    sel.addEventListener('change',checkObligasi);
+    checkObligasi();
+  }
+}
+
+function checkObligasi(){
+  const sel=document.getElementById('fCat');
+  const selected=categories.find(c=>c.id==sel.value);
+  const isObligasi=selected&&selected.name.toLowerCase().includes('obligasi');
+  document.getElementById('obligasiExtra').style.display=isObligasi?'block':'none';
+  if(isObligasi){
+    ['fKuponRate','fNominal','fTglBeli','fTglJatuhTempo'].forEach(id=>{
+      document.getElementById(id).addEventListener('input',updateObligasiPreview);
+    });
+  }
+}
+
+function updateObligasiPreview(){
+  const nominal=parseFloat(document.getElementById('fNominal').value)||0;
+  const rate=parseFloat(document.getElementById('fKuponRate').value)||0;
+  const tglBeli=document.getElementById('fTglBeli').value;
+  const tglJatuh=document.getElementById('fTglJatuhTempo').value;
+  const preview=document.getElementById('obligasiPreview');
+  if(!nominal||!rate||!tglBeli||!tglJatuh){preview.style.display='none';return;}
+  const beli=new Date(tglBeli);
+  const jatuh=new Date(tglJatuh);
+  const now=new Date();
+  const totalBulan=Math.max(0,Math.round((jatuh-beli)/(1000*60*60*24*30)));
+  const bulanBerjalan=Math.max(0,Math.min(Math.round((now-beli)/(1000*60*60*24*30)),totalBulan));
+  const kuponPerBulan=(nominal*rate/100)/12;
+  const totalKuponKotor=kuponPerBulan*totalBulan;
+  const kuponDiterima=kuponPerBulan*bulanBerjalan;
+  const pajak=totalKuponKotor*0.1;
+  const gainBersih=totalKuponKotor-pajak;
+  // auto isi amount
+  document.getElementById('fAmount').value=nominal;
+  preview.style.display='block';
+  preview.innerHTML=`
+    <strong>📋 Kalkulasi Obligasi:</strong><br>
+    Kupon/bulan (kotor): <b>${fmt(kuponPerBulan)}</b><br>
+    Total kupon s/d jatuh tempo: <b>${fmt(totalKuponKotor)}</b><br>
+    Pajak kupon (10%): <b>-${fmt(pajak)}</b><br>
+    <strong>Total gain bersih: ${fmt(gainBersih)}</strong><br>
+    Sudah berjalan: <b>${bulanBerjalan} bulan</b> dari ${totalBulan} bulan<br>
+    Kupon sudah diterima: <b>${fmt(kuponDiterima)}</b>
+  `;
 }
 
 async function saveTransaction(){
@@ -233,6 +281,23 @@ async function saveTransaction(){
     obj.buy_price=parseFloat(document.getElementById('fBuyPrice').value)||0;
     obj.cur_price=parseFloat(document.getElementById('fCurPrice').value)||0;
     obj.units=parseFloat(document.getElementById('fUnits').value)||1;
+    // Obligasi
+    const selected=categories.find(c=>c.id==cat_id);
+    if(selected&&selected.name.toLowerCase().includes('obligasi')){
+      obj.kupon_rate=parseFloat(document.getElementById('fKuponRate').value)||0;
+      obj.tgl_beli=document.getElementById('fTglBeli').value||null;
+      obj.tgl_jatuh_tempo=document.getElementById('fTglJatuhTempo').value||null;
+      // Hitung cur_price otomatis dari gain obligasi
+      const nominal=amount;
+      const rate=obj.kupon_rate;
+      const tglBeli=new Date(obj.tgl_beli);
+      const tglJatuh=new Date(obj.tgl_jatuh_tempo);
+      const totalBulan=Math.max(0,Math.round((tglJatuh-tglBeli)/(1000*60*60*24*30)));
+      const kuponPerBulan=(nominal*rate/100)/12;
+      const totalKuponBersih=kuponPerBulan*totalBulan*0.9;
+      obj.cur_price=nominal+totalKuponBersih;
+      obj.units=1;
+    }
   }
   if(editId){
     await sb.from('transactions').update(obj).eq('id',editId);
