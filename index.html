@@ -1,4 +1,29 @@
-<!DOCTYPE html>
+<!-- OBLIGASI FIELDS -->
+      <div id="obligasiExtra" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+        <div style="font-size:12px;font-weight:600;color:#6366f1;margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em">📋 Detail Obligasi Fixed Rate</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Kupon Rate (% per tahun)</label>
+            <input class="form-control" type="number" id="fKuponRate" placeholder="cth: 6.89" step="0.01" oninput="updateObligasiPreview()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Harga Beli (%)</label>
+            <input class="form-control" type="number" id="fHargaBeliPct" placeholder="cth: 102.15" step="0.01" oninput="updateObligasiPreview()">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Jumlah Unit</label>
+            <input class="form-control" type="number" id="fJumlahUnit" placeholder="cth: 30" oninput="updateObligasiPreview()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tanggal Beli</label>
+            <input class="form-control" type="date" id="fTglBeli" oninput="updateObligasiPreview()">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label"><!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
@@ -259,29 +284,35 @@
         <div style="font-size:12px;font-weight:600;color:#6366f1;margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em">📋 Detail Obligasi Fixed Rate</div>
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Kupon Rate (% per tahun)</label>
-            <input class="form-control" type="number" id="fKuponRate" placeholder="cth: 6.25" step="0.01" oninput="updateObligasiPreview()">
+            <label class="form-label">Yield / Kupon Rate (% per tahun)</label>
+            <input class="form-control" type="number" id="fKuponRate" placeholder="cth: 6.89" step="0.01" oninput="updateObligasiPreview()">
           </div>
           <div class="form-group">
-            <label class="form-label">Jumlah Unit</label>
-            <input class="form-control" type="number" id="fJumlahUnit" placeholder="cth: 10" oninput="updateObligasiPreview()">
+            <label class="form-label">Harga Beli (%)</label>
+            <input class="form-control" type="number" id="fHargaBeliPct" placeholder="cth: 102.15" step="0.01" oninput="updateObligasiPreview()">
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
+            <label class="form-label">Jumlah Unit</label>
+            <input class="form-control" type="number" id="fJumlahUnit" placeholder="cth: 30" oninput="updateObligasiPreview()">
+          </div>
+          <div class="form-group">
             <label class="form-label">Tanggal Beli</label>
             <input class="form-control" type="date" id="fTglBeli" oninput="updateObligasiPreview()">
           </div>
+        </div>
+        <div class="form-row">
           <div class="form-group">
             <label class="form-label">Tanggal Kupon Terakhir</label>
             <input class="form-control" type="date" id="fTglKuponTerakhir" oninput="updateObligasiPreview()">
           </div>
+          <div class="form-group">
+            <label class="form-label">Tanggal Jatuh Tempo</label>
+            <input class="form-control" type="date" id="fTglJatuhTempo" oninput="updateObligasiPreview()">
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Tanggal Jatuh Tempo</label>
-          <input class="form-control" type="date" id="fTglJatuhTempo" oninput="updateObligasiPreview()">
-        </div>
-        <div id="obligasiPreview" style="display:none;padding:12px;border-radius:8px;background:#ede9fe;color:#6d28d9;font-size:13px;margin-bottom:10px;line-height:1.8"></div>
+        <div id="obligasiPreview" style="display:none;padding:12px;border-radius:8px;background:#ede9fe;color:#1e293b;font-size:13px;margin-bottom:10px;line-height:2"></div>
       </div>
     </div>
     <div class="form-group">
