@@ -766,3 +766,11 @@ setInterval(()=>{
   const el=document.getElementById('currentDate');
   if(el)el.textContent=new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 }, 60000);
+// Auto refresh data setiap 5 menit
+setInterval(async()=>{
+  if(!currentUser)return;
+  await loadTransactions();
+  renderDashboard();
+  const el=document.getElementById('currentDate');
+  if(el)el.textContent=new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+}, 5*60*1000);
