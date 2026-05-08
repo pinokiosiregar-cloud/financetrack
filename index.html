@@ -1,29 +1,4 @@
-<!-- OBLIGASI FIELDS -->
-      <div id="obligasiExtra" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
-        <div style="font-size:12px;font-weight:600;color:#6366f1;margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em">📋 Detail Obligasi Fixed Rate</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Kupon Rate (% per tahun)</label>
-            <input class="form-control" type="number" id="fKuponRate" placeholder="cth: 6.89" step="0.01" oninput="updateObligasiPreview()">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Harga Beli (%)</label>
-            <input class="form-control" type="number" id="fHargaBeliPct" placeholder="cth: 102.15" step="0.01" oninput="updateObligasiPreview()">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Jumlah Unit</label>
-            <input class="form-control" type="number" id="fJumlahUnit" placeholder="cth: 30" oninput="updateObligasiPreview()">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Tanggal Beli</label>
-            <input class="form-control" type="date" id="fTglBeli" oninput="updateObligasiPreview()">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label"><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
@@ -129,11 +104,11 @@
         <div class="grid-3">
           <div class="panel">
             <div class="panel-header"><div class="panel-title"><i class="ti ti-chart-line" style="color:#6366f1"></i> Grafik Keuangan Per Bulan</div></div>
-            <div class="chart-wrap"><canvas id="chartLine" role="img" aria-label="Arus keuangan">Grafik</canvas></div>
+            <div class="chart-wrap"><canvas id="chartLine">Grafik</canvas></div>
           </div>
           <div class="panel">
             <div class="panel-header"><div class="panel-title"><i class="ti ti-chart-donut" style="color:#8b5cf6"></i> Komposisi</div></div>
-            <div class="chart-wrap"><canvas id="chartDoughnut" role="img" aria-label="Komposisi">Komposisi</canvas></div>
+            <div class="chart-wrap"><canvas id="chartDoughnut">Komposisi</canvas></div>
           </div>
         </div>
         <div class="panel">
@@ -143,7 +118,7 @@
           </div>
           <table class="tbl">
             <thead><tr><th>Kategori</th><th>Deskripsi</th><th>Tanggal</th><th>Tipe</th><th style="text-align:right">Jumlah</th></tr></thead>
-            <tbody id="recentTbl"><tr><td colspan="5"><div class="empty"><i class="ti ti-inbox"></i>Belum ada transaksi</div></td></tr></tbody>
+            <tbody id="recentTbl"></tbody>
           </table>
         </div>
       </div>
@@ -176,20 +151,28 @@
       <div class="page" id="page-investasi">
         <div class="cards-grid" style="grid-template-columns:repeat(3,1fr)">
           <div class="card card-grad grad-blue"><div class="card-label"><i class="ti ti-building-bank"></i>Total Modal</div><div class="card-value" id="invModal">Rp 0</div></div>
-          <div class="card card-grad grad-teal"><div class="card-label"><i class="ti ti-trending-up"></i>Estimasi Gain</div><div class="card-value" id="invGain">Rp 0</div></div>
+          <div class="card card-grad grad-teal"><div class="card-label"><i class="ti ti-trending-up"></i>Total Gain/Loss</div><div class="card-value" id="invGain">Rp 0</div></div>
           <div class="card card-grad grad-purple"><div class="card-label"><i class="ti ti-percentage"></i>Return</div><div class="card-value" id="invReturn">0%</div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="filterInv('semua')" id="finv-semua" style="border-color:#6366f1;color:#6366f1">Semua</button>
+          <button class="btn btn-ghost btn-sm" onclick="filterInv('saham')" id="finv-saham">Saham</button>
+          <button class="btn btn-ghost btn-sm" onclick="filterInv('crypto')" id="finv-crypto">Crypto</button>
+          <button class="btn btn-ghost btn-sm" onclick="filterInv('emas')" id="finv-emas">Emas</button>
+          <button class="btn btn-ghost btn-sm" onclick="filterInv('obligasi')" id="finv-obligasi">Obligasi</button>
+          <button class="btn btn-primary btn-sm" onclick="refreshPrices()" id="btnRefresh"><i class="ti ti-refresh"></i> Update Harga</button>
         </div>
         <div class="grid-2">
           <div class="panel">
             <div class="panel-header"><div class="panel-title"><i class="ti ti-list" style="color:#6366f1"></i> Portofolio Investasi</div></div>
             <table class="tbl">
-              <thead><tr><th>Aset</th><th>Kode/Nama</th><th>Kategori</th><th>Modal</th><th>Nilai Kini</th><th style="text-align:right">Gain/Loss</th></tr></thead>
+              <thead><tr><th>Aset</th><th>Kategori</th><th>Modal</th><th>Nilai Kini</th><th style="text-align:right">Gain/Loss</th><th></th></tr></thead>
               <tbody id="invTbl"></tbody>
             </table>
           </div>
           <div class="panel">
             <div class="panel-header"><div class="panel-title"><i class="ti ti-chart-donut" style="color:#8b5cf6"></i> Alokasi Investasi</div></div>
-            <div class="chart-wrap"><canvas id="chartInv" role="img" aria-label="Alokasi investasi">Alokasi</canvas></div>
+            <div class="chart-wrap"><canvas id="chartInv">Alokasi</canvas></div>
           </div>
         </div>
       </div>
@@ -199,11 +182,11 @@
         <div class="grid-2">
           <div class="panel">
             <div class="panel-header"><div class="panel-title"><i class="ti ti-chart-bar" style="color:var(--red)"></i> Pengeluaran per Kategori</div></div>
-            <div class="chart-wrap"><canvas id="chartCat" role="img" aria-label="Pengeluaran kategori">Pengeluaran</canvas></div>
+            <div class="chart-wrap"><canvas id="chartCat">Pengeluaran</canvas></div>
           </div>
           <div class="panel">
             <div class="panel-header"><div class="panel-title"><i class="ti ti-chart-bar" style="color:var(--green)"></i> Pemasukan per Kategori</div></div>
-            <div class="chart-wrap"><canvas id="chartInCat" role="img" aria-label="Pemasukan kategori">Pemasukan</canvas></div>
+            <div class="chart-wrap"><canvas id="chartInCat">Pemasukan</canvas></div>
           </div>
         </div>
         <div class="panel">
@@ -252,69 +235,118 @@
     </div>
     <div class="form-group">
       <label class="form-label">Kategori</label>
-      <select class="form-control" id="fCat"></select>
+      <select class="form-control" id="fCat" onchange="onCatChange()"></select>
     </div>
     <div class="form-group">
       <label class="form-label">Deskripsi</label>
       <input class="form-control" type="text" id="fDesc" placeholder="Deskripsi singkat...">
     </div>
-    <div id="investExtra" style="display:none">
-      <div class="form-group">
-        <label class="form-label">Kode Saham / Nama Kripto</label>
-        <input class="form-control" type="text" id="fTicker" placeholder="Contoh: BBCA / Bitcoin">
+
+    <!-- SAHAM FIELDS -->
+    <div id="sahamExtra" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+      <div style="font-size:12px;font-weight:600;color:#2563eb;margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em">📈 Detail Saham IDX</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Kode Saham</label>
+          <input class="form-control" type="text" id="fKodeSaham" placeholder="cth: BBCA" oninput="this.value=this.value.toUpperCase();updateSahamPreview()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Jumlah Lot</label>
+          <input class="form-control" type="number" id="fLot" placeholder="cth: 10" oninput="updateSahamPreview()">
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Harga Beli/unit (Rp)</label>
-          <input class="form-control" type="number" id="fBuyPrice" placeholder="0">
+          <label class="form-label">Average Price (Rp/saham)</label>
+          <input class="form-control" type="number" id="fAvgPrice" placeholder="cth: 9500" oninput="updateSahamPreview()">
         </div>
         <div class="form-group">
-          <label class="form-label">Harga Kini/unit (Rp)</label>
-          <input class="form-control" type="number" id="fCurPrice" placeholder="0">
+          <label class="form-label">Current Price (Rp/saham)</label>
+          <input class="form-control" type="number" id="fCurPriceSaham" placeholder="cth: 10000" oninput="updateSahamPreview()">
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Jumlah Unit / Lot / Koin</label>
-        <input class="form-control" type="number" id="fUnits" placeholder="0">
-      </div>
-      <div id="gainPreview" style="display:none;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:10px"></div>
-
-      <!-- OBLIGASI FIELDS -->
-      <div id="obligasiExtra" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
-        <div style="font-size:12px;font-weight:600;color:#6366f1;margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em">📋 Detail Obligasi Fixed Rate</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Yield / Kupon Rate (% per tahun)</label>
-            <input class="form-control" type="number" id="fKuponRate" placeholder="cth: 6.89" step="0.01" oninput="updateObligasiPreview()">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Harga Beli (%)</label>
-            <input class="form-control" type="number" id="fHargaBeliPct" placeholder="cth: 102.15" step="0.01" oninput="updateObligasiPreview()">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Jumlah Unit</label>
-            <input class="form-control" type="number" id="fJumlahUnit" placeholder="cth: 30" oninput="updateObligasiPreview()">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Tanggal Beli</label>
-            <input class="form-control" type="date" id="fTglBeli" oninput="updateObligasiPreview()">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Tanggal Kupon Terakhir</label>
-            <input class="form-control" type="date" id="fTglKuponTerakhir" oninput="updateObligasiPreview()">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Tanggal Jatuh Tempo</label>
-            <input class="form-control" type="date" id="fTglJatuhTempo" oninput="updateObligasiPreview()">
-          </div>
-        </div>
-        <div id="obligasiPreview" style="display:none;padding:12px;border-radius:8px;background:#ede9fe;color:#1e293b;font-size:13px;margin-bottom:10px;line-height:2"></div>
-      </div>
+      <div id="sahamPreview" style="display:none;padding:12px;border-radius:8px;background:#dbeafe;color:#1e40af;font-size:13px;margin-bottom:10px;line-height:1.9"></div>
     </div>
+
+    <!-- CRYPTO FIELDS -->
+    <div id="cryptoExtra" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+      <div style="font-size:12px;font-weight:600;color:#d97706;margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em">₿ Detail Crypto</div>
+      <div class="form-group">
+        <label class="form-label">Cari Koin</label>
+        <input class="form-control" type="text" id="fCoinSearch" placeholder="cth: bitcoin, ethereum..." oninput="searchCoin()">
+        <div id="coinDropdown" style="display:none;border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;margin-top:4px;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>
+      </div>
+      <div id="fCoinSelected" style="display:none;padding:8px 12px;background:#fef3c7;border-radius:8px;font-size:13px;margin-bottom:12px;display:flex;align-items:center;gap:8px"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Jumlah Koin</label>
+          <input class="form-control" type="number" id="fCoinQty" placeholder="cth: 0.5" step="any" oninput="updateCryptoPreview()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Harga Beli/koin (Rp)</label>
+          <input class="form-control" type="number" id="fCoinBuyPrice" placeholder="cth: 1500000000" oninput="updateCryptoPreview()">
+        </div>
+      </div>
+      <div id="cryptoPreview" style="display:none;padding:12px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:13px;margin-bottom:10px;line-height:1.9"></div>
+    </div>
+
+    <!-- EMAS FIELDS -->
+    <div id="emasExtra" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+      <div style="font-size:12px;font-weight:600;color:#d97706;margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em">🥇 Detail Emas</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Berat (gram)</label>
+          <input class="form-control" type="number" id="fGoldGram" placeholder="cth: 10" step="any" oninput="updateEmasPreview()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Harga Beli/gram (Rp)</label>
+          <input class="form-control" type="number" id="fGoldBuyPrice" placeholder="cth: 1200000" oninput="updateEmasPreview()">
+        </div>
+      </div>
+      <div id="emasPreview" style="display:none;padding:12px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:13px;margin-bottom:10px;line-height:1.9"></div>
+    </div>
+
+    <!-- OBLIGASI FIELDS -->
+    <div id="obligasiExtra" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+      <div style="font-size:12px;font-weight:600;color:#6366f1;margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em">📋 Detail Obligasi Fixed Rate</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Yield / Kupon Rate (% per tahun)</label>
+          <input class="form-control" type="number" id="fKuponRate" placeholder="cth: 6.89" step="0.01" oninput="updateObligasiPreview()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Harga Beli (%)</label>
+          <input class="form-control" type="number" id="fHargaBeliPct" placeholder="cth: 102.15" step="0.01" oninput="updateObligasiPreview()">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Jumlah Unit</label>
+          <input class="form-control" type="number" id="fJumlahUnit" placeholder="cth: 30" oninput="updateObligasiPreview()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tanggal Beli</label>
+          <input class="form-control" type="date" id="fTglBeli" oninput="updateObligasiPreview()">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Tanggal Kupon Terakhir (opsional)</label>
+          <input class="form-control" type="date" id="fTglKuponTerakhir" oninput="updateObligasiPreview()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tanggal Jatuh Tempo</label>
+          <input class="form-control" type="date" id="fTglJatuhTempo" oninput="updateObligasiPreview()">
+        </div>
+      </div>
+      <div id="obligasiPreview" style="display:none;padding:12px;border-radius:8px;background:#ede9fe;color:#1e293b;font-size:13px;margin-bottom:10px;line-height:2"></div>
+    </div>
+
+    <!-- DEFAULT INVEST FIELDS -->
+    <div id="investExtra" style="display:none">
+      <div id="gainPreview" style="display:none;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:10px"></div>
+    </div>
+
     <div class="form-group">
       <label class="form-label">Catatan (opsional)</label>
       <input class="form-control" type="text" id="fNote" placeholder="Catatan tambahan...">
@@ -322,6 +354,17 @@
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
       <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
       <button class="btn btn-primary" onclick="saveTransaction()"><i class="ti ti-check"></i>Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ANALISA AI -->
+<div class="modal-bg" id="analysisModalBg">
+  <div class="modal" style="width:560px">
+    <div class="modal-title"><i class="ti ti-robot" style="color:#6366f1"></i><span id="analysisTitleText">Analisa AI</span></div>
+    <div id="analysisContent" style="font-size:13px;line-height:1.8;max-height:400px;overflow-y:auto;white-space:pre-wrap"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="document.getElementById('analysisModalBg').classList.remove('open')">Tutup</button>
     </div>
   </div>
 </div>
