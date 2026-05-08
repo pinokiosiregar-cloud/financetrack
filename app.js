@@ -238,71 +238,100 @@ function checkObligasi(){
 }
 
 function hitungObligasi(t, tglHitung=new Date()){
-  const nominal=t.nominal_per_unit||1000000;
+  const NOMINAL=t.nominal_per_unit||1000000;
   const rate=t.kupon_rate||0;
   const units=t.units||1;
-  const hargaBeli=t.buy_price||nominal;
   const tglBeli=new Date(t.tgl_beli||t.date);
   const tglJatuh=new Date(t.tgl_jatuh_tempo||t.date);
   const tglKuponTerakhir=t.tgl_kupon_terakhir?new Date(t.tgl_kupon_terakhir):tglBeli;
 
-  const totalModal=hargaBeli*units;
-  const kuponHarian=(nominal*rate/100)/365;
+  const totalModal=NOMINAL*units;
+
+  // Kupon per periode (6 bulan)
+  const kuponPerPeriode=NOMINAL*rate/100*0.5; // per 6 bulan
+  const kuponPerPeriodeTotal=kuponPerPeriode*units;
+
+  // Kupon harian = (Nominal × Rate) / 365
+  const kuponHarian=(NOMINAL*rate/100)/365;
   const kuponHarianTotal=kuponHarian*units;
 
-  // Accrued interest (kupon penjual) = dari tgl kupon terakhir ke tgl beli
+  // Kupon penjual (accrued interest) = dari tgl kupon terakhir ke tgl beli
   const hariAccrued=Math.max(0,Math.round((tglBeli-tglKuponTerakhir)/(1000*60*60*24)));
   const kuponPenjual=kuponHarian*hariAccrued*units;
+  const kuponPenjualBersih=kuponPenjual*0.9; // pajak 10%
 
   // Kupon berjalan = dari tgl beli ke hari ini
   const hariBerjalan=Math.max(0,Math.round((tglHitung-tglBeli)/(1000*60*60*24)));
   const kuponBerjalan=kuponHarianTotal*hariBerjalan;
   const kuponBerjalanBersih=kuponBerjalan*0.9; // pajak 10%
 
+  // Periode kupon berikutnya (6 bulan dari kupon terakhir)
+  const kuponBerikutnya=new Date(tglKuponTerakhir);
+  while(kuponBerikutnya<=tglHitung){
+    kuponBerikutnya.setMonth(kuponBerikutnya.getMonth()+6);
+  }
+  const hariKuponBerikutnya=Math.round((kuponBerikutnya-tglHitung)/(1000*60*60*24));
+
   // Total hari hingga jatuh tempo
   const totalHari=Math.max(0,Math.round((tglJatuh-tglBeli)/(1000*60*60*24)));
   const totalKuponKotor=kuponHarianTotal*totalHari;
   const totalKuponBersih=totalKuponKotor*0.9;
 
-  // Yield rata-rata
-  const yield_=rate;
-
   // Gain % berjalan
   const gainPct=totalModal>0?((kuponBerjalanBersih/totalModal)*100).toFixed(2):0;
 
-  return{totalModal,kuponPenjual,kuponBerjalan:kuponBerjalanBersih,kuponHarian:kuponHarianTotal,totalKuponBersih,units,yield_,hariBerjalan,totalHari,gainPct};
+  return{
+    totalModal,
+    kuponPenjual:kuponPenjualBersih,
+    kuponBerjalan:kuponBerjalanBersih,
+    kuponHarian:kuponHarianTotal,
+    kuponPerPeriode:kuponPerPeriodeTotal,
+    totalKuponBersih,
+    units,
+    yield_:rate,
+    hariBerjalan,
+    totalHari,
+    gainPct,
+    kuponBerikutnya:kuponBerikutnya.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}),
+    hariKuponBerikutnya,
+  };
 }
 
 function updateObligasiPreview(){
   const rate=parseFloat(document.getElementById('fKuponRate').value)||0;
-  const nominalUnit=parseFloat(document.getElementById('fNominalUnit').value)||0;
-  const hargaBeli=parseFloat(document.getElementById('fHargaBeli').value)||0;
   const jumlahUnit=parseFloat(document.getElementById('fJumlahUnit').value)||0;
   const tglBeli=document.getElementById('fTglBeli').value;
   const tglKuponTerakhir=document.getElementById('fTglKuponTerakhir').value;
   const tglJatuh=document.getElementById('fTglJatuhTempo').value;
   const preview=document.getElementById('obligasiPreview');
-  if(!rate||!nominalUnit||!hargaBeli||!jumlahUnit||!tglBeli||!tglJatuh){preview.style.display='none';return;}
+  if(!rate||!jumlahUnit||!tglBeli||!tglJatuh){preview.style.display='none';return;}
 
-  // Auto isi amount
-  document.getElementById('fAmount').value=hargaBeli*jumlahUnit;
+  const NOMINAL=1000000;
+  const totalModal=NOMINAL*jumlahUnit;
+  document.getElementById('fAmount').value=totalModal;
 
   const mock={
-    nominal_per_unit:nominalUnit,kupon_rate:rate,units:jumlahUnit,
-    buy_price:hargaBeli,tgl_beli:tglBeli,tgl_jatuh_tempo:tglJatuh,
+    nominal_per_unit:NOMINAL,
+    kupon_rate:rate,
+    units:jumlahUnit,
+    buy_price:NOMINAL,
+    tgl_beli:tglBeli,
+    tgl_jatuh_tempo:tglJatuh,
     tgl_kupon_terakhir:tglKuponTerakhir||tglBeli
   };
   const h=hitungObligasi(mock);
   preview.style.display='block';
   preview.innerHTML=`
-    <strong>📋 Kalkulasi Obligasi:</strong><br>
+    <strong>📋 Kalkulasi Obligasi FR (Kupon 6 Bulanan):</strong><br>
     Total Modal Investasi: <b>${fmt(h.totalModal)}</b><br>
-    Total Kupon Penjual (accrued): <b>${fmt(h.kuponPenjual)}</b><br>
+    Total Kupon Penjual (accrued, bersih): <b>${fmt(h.kuponPenjual)}</b><br>
     Total Kupon Berjalan (bersih): <b style="color:#16a34a">${fmt(h.kuponBerjalan)}</b><br>
     Kupon Harian: <b>+${fmt(h.kuponHarian)}/hari</b><br>
+    Kupon per Periode (6 bln, kotor): <b>${fmt(h.kuponPerPeriode)}</b><br>
     Total Unit Obligasi: <b>${h.units} unit</b><br>
     Yield Rata-rata: <b>${h.yield_}%</b><br>
-    Gain Berjalan: <b style="color:#16a34a">+${h.gainPct}% (${h.hariBerjalan} hari)</b>
+    Gain Berjalan: <b style="color:#16a34a">+${h.gainPct}% (${h.hariBerjalan} hari)</b><br>
+    🗓️ Kupon berikutnya: <b>${h.kuponBerikutnya}</b> (${h.hariKuponBerikutnya} hari lagi)
   `;
 }
 
@@ -322,14 +351,16 @@ async function saveTransaction(){
     // Obligasi
     const selected=categories.find(c=>c.id==cat_id);
     if(selected&&selected.name.toLowerCase().includes('obligasi')){
+      const NOMINAL=1000000;
       obj.kupon_rate=parseFloat(document.getElementById('fKuponRate').value)||0;
-      obj.nominal_per_unit=parseFloat(document.getElementById('fNominalUnit').value)||0;
+      obj.nominal_per_unit=NOMINAL;
+      obj.units=parseFloat(document.getElementById('fJumlahUnit').value)||1;
+      obj.buy_price=NOMINAL;
+      obj.cur_price=NOMINAL;
       obj.tgl_beli=document.getElementById('fTglBeli').value||null;
       obj.tgl_jatuh_tempo=document.getElementById('fTglJatuhTempo').value||null;
       obj.tgl_kupon_terakhir=document.getElementById('fTglKuponTerakhir').value||null;
-      obj.buy_price=parseFloat(document.getElementById('fHargaBeli').value)||0;
-      obj.units=parseFloat(document.getElementById('fJumlahUnit').value)||1;
-      obj.cur_price=obj.buy_price;
+      obj.amount=NOMINAL*obj.units;
     }
   }
   if(editId){
