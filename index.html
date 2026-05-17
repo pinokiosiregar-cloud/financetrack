@@ -179,6 +179,11 @@
 
       <!-- LAPORAN -->
       <div class="page" id="page-laporan">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+          <div style="font-size:14px;font-weight:600">Filter Bulan:</div>
+          <input type="month" class="form-control" style="width:auto" id="laporanMonth" onchange="renderLaporan()">
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('laporanMonth').value='';renderLaporan()">Reset</button>
+        </div>
         <div class="grid-2">
           <div class="panel">
             <div class="panel-header"><div class="panel-title"><i class="ti ti-chart-bar" style="color:var(--red)"></i> Pengeluaran per Kategori</div></div>
@@ -195,6 +200,24 @@
             <thead><tr><th>Bulan</th><th style="text-align:right">Pemasukan</th><th style="text-align:right">Pengeluaran</th><th style="text-align:right">Investasi</th><th style="text-align:right">Saldo</th></tr></thead>
             <tbody id="monthlyTbl"></tbody>
           </table>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title"><i class="ti ti-arrow-up-circle" style="color:var(--red)"></i> Rekapan Pengeluaran per Kategori per Bulan</div></div>
+          <div style="overflow-x:auto">
+            <table class="tbl">
+              <thead><tr id="rekapOutHeader"></tr></thead>
+              <tbody id="rekapOutTbl"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title"><i class="ti ti-arrow-down-circle" style="color:var(--green)"></i> Rekapan Pemasukan per Kategori per Bulan</div></div>
+          <div style="overflow-x:auto">
+            <table class="tbl">
+              <thead><tr id="rekapInHeader"></tr></thead>
+              <tbody id="rekapInTbl"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
