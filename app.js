@@ -776,7 +776,7 @@ function renderKategoriPerBulan(type, months){
     if(total===0)return'';
     return`<tr>
       <td style="font-weight:500">${nm}</td>
-      ${months.map(m=>`<td style="text-align:right;font-size:12px">${catMap[nm][m]?fmt(catMap[nm][m]).replace('Rp ',''):'-'}</td>`).join('')}
+      ${months.map(m=>`<td style="text-align:right;font-size:12px">${catMap[nm][m]?fmt(catMap[nm][m]):'-'}</td>`).join('')}
       <td style="text-align:right;font-weight:600;color:${color}">${fmt(total)}</td>
     </tr>`;
   }).join('');
@@ -786,8 +786,8 @@ function renderKategoriPerBulan(type, months){
   const grandTotal=rowTotal.reduce((a,v)=>a+v,0);
   tb.innerHTML+=`<tr style="background:#f8fafc;font-weight:600;border-top:2px solid var(--border)">
     <td>TOTAL</td>
-    ${rowTotal.map(v=>`<td style="text-align:right;color:${color}">${fmt(v).replace('Rp ','')}</td>`).join('')}
-    <td style="text-align:right;color:${color}">${fmt(grandTotal)}</td>
+    ${rowTotal.map(v=>`<td style="text-align:right;color:${color}">${fmt(v)}</td>`).join('')}
+<td style="text-align:right;color:${color}">${fmt(grandTotal)}</td>
   </tr>`;
 }
 
