@@ -636,9 +636,13 @@ function renderCharts(data){
   if(doughnutChart){doughnutChart.destroy();doughnutChart=null;}
   if(chartKosong('chartDoughnut',!topExp.length,'Belum ada pengeluaran'))return;
   doughnutChart=new Chart(document.getElementById('chartDoughnut'),{
-    type:'doughnut',
-    data:{labels:topExp,datasets:[{data:topData,backgroundColor:[COLORS.red,COLORS.amber,COLORS.purple,COLORS.blue,COLORS.green]}]},
-    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'bottom'}}}
+    type:'bar',
+    data:{labels:topExp,datasets:[{data:topData,backgroundColor:COLORS.red,borderRadius:5,barThickness:24}]},
+    options:{
+      indexAxis:'y',responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{display:false}},
+      scales:{x:{display:true,beginAtZero:true,grid:{display:true,drawBorder:false}},y:{display:true,grid:{display:false,drawBorder:false}}}
+    }
   });
 }
 
