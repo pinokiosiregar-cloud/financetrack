@@ -8,6 +8,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="style.css">
+<style>
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.btn:disabled{opacity:0.6;cursor:not-allowed}
+.error-msg{color:var(--red);padding:8px;background:rgba(var(--red-rgb),0.05);border-radius:4px;margin:8px 0;display:none;font-size:12px}
+.success-msg{color:var(--green);padding:8px;background:rgba(var(--green-rgb),0.05);border-radius:4px;margin:8px 0;display:none;font-size:12px}
+</style>
 </head>
 <body>
 
@@ -29,8 +35,8 @@
         <label class="form-label" for="authPassword">Password</label>
         <input class="form-control" type="password" id="authPassword" placeholder="Password" autocomplete="current-password">
       </div>
-      <div id="authMsg" class="auth-msg"></div>
-      <button class="btn btn-primary btn-block" onclick="handleLogin()"><i class="ti ti-login" aria-hidden="true"></i> Masuk</button>
+      <div id="authMsg" class="error-msg"></div>
+      <button class="btn btn-primary btn-block" onclick="handleLogin()" onkeypress="if(event.key==='Enter')handleLogin()"><i class="ti ti-login" aria-hidden="true"></i> Masuk</button>
       <div class="auth-alt">
         Belum punya akun? <a href="#" class="auth-link" onclick="showRegister()">Daftar</a>
       </div>
@@ -45,8 +51,8 @@
         <label class="form-label" for="regPassword">Password</label>
         <input class="form-control" type="password" id="regPassword" placeholder="Minimal 6 karakter" autocomplete="new-password">
       </div>
-      <div id="regMsg" class="auth-msg"></div>
-      <button class="btn btn-primary btn-block" onclick="handleRegister()"><i class="ti ti-user-plus" aria-hidden="true"></i> Daftar</button>
+      <div id="regMsg" class="error-msg"></div>
+      <button class="btn btn-primary btn-block" onclick="handleRegister()" onkeypress="if(event.key==='Enter')handleRegister()"><i class="ti ti-user-plus" aria-hidden="true"></i> Daftar</button>
       <div class="auth-alt">
         Sudah punya akun? <a href="#" class="auth-link" onclick="showLogin()">Masuk</a>
       </div>
@@ -72,17 +78,17 @@
 
     <nav class="nav">
       <div class="nav-section">Ringkasan</div>
-      <div class="nav-item active" onclick="showPage('dashboard',this)" title="Dashboard"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Dashboard</div>
+      <div class="nav-item active" onclick="showPage('dashboard',this)" title="Dashboard" role="button" tabindex="0"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Dashboard</div>
       <div class="nav-section">Data</div>
-      <div class="nav-item" onclick="showPage('transaksi',this)" title="Data transaksi"><i class="ti ti-list" aria-hidden="true"></i>Data transaksi</div>
-      <div class="nav-item" onclick="showPage('investasi',this)" title="Investasi"><i class="ti ti-trending-up" aria-hidden="true"></i>Investasi</div>
-      <div class="nav-item" onclick="showPage('laporan',this)" title="Laporan"><i class="ti ti-chart-bar" aria-hidden="true"></i>Laporan</div>
+      <div class="nav-item" onclick="showPage('transaksi',this)" title="Data transaksi" role="button" tabindex="0"><i class="ti ti-list" aria-hidden="true"></i>Data transaksi</div>
+      <div class="nav-item" onclick="showPage('investasi',this)" title="Investasi" role="button" tabindex="0"><i class="ti ti-trending-up" aria-hidden="true"></i>Investasi</div>
+      <div class="nav-item" onclick="showPage('laporan',this)" title="Laporan" role="button" tabindex="0"><i class="ti ti-chart-bar" aria-hidden="true"></i>Laporan</div>
       <div class="nav-section">Pengaturan</div>
-      <div class="nav-item" onclick="showPage('kategori',this)" title="Data kategori"><i class="ti ti-tag" aria-hidden="true"></i>Data kategori</div>
+      <div class="nav-item" onclick="showPage('kategori',this)" title="Data kategori" role="button" tabindex="0"><i class="ti ti-tag" aria-hidden="true"></i>Data kategori</div>
     </nav>
 
     <div class="sidebar-footer">
-      <div class="nav-item nav-item-danger" onclick="handleLogout()" title="Keluar"><i class="ti ti-logout" aria-hidden="true"></i>Keluar</div>
+      <div class="nav-item nav-item-danger" onclick="handleLogout()" title="Keluar" role="button" tabindex="0"><i class="ti ti-logout" aria-hidden="true"></i>Keluar</div>
     </div>
   </aside>
 
@@ -165,57 +171,31 @@
 
       <!-- ---------- INVESTASI ---------- -->
       <div class="page" id="page-investasi">
-        <div class="cards-grid">
-          <div class="stat stat-inv">
-            <div class="stat-label"><i class="ti ti-building-bank" aria-hidden="true"></i>Total modal</div>
-            <div class="stat-value" id="invModal">Rp 0</div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><i class="ti ti-trending-up i-brand" aria-hidden="true"></i> Portfolio aset</div>
+            <button class="btn btn-primary btn-sm" onclick="openModal()"><i class="ti ti-plus" aria-hidden="true"></i>Tambah</button>
           </div>
-          <div class="stat stat-in">
-            <div class="stat-label"><i class="ti ti-trending-up" aria-hidden="true"></i>Gain / loss</div>
-            <div class="stat-value" id="invGain">Rp 0</div>
-          </div>
-          <div class="stat stat-purple">
-            <div class="stat-label"><i class="ti ti-percentage" aria-hidden="true"></i>Return</div>
-            <div class="stat-value" id="invReturn">0%</div>
+          <div class="scroll-x">
+            <table class="tbl">
+              <thead><tr><th></th><th>Nama aset</th><th>Tanggal</th><th>Kategori</th><th class="ta-r">Modal</th><th class="ta-r">Nilai kini</th><th class="ta-r">P&L</th><th></th></tr></thead>
+              <tbody id="investTbl"></tbody>
+            </table>
           </div>
         </div>
-
-        <div class="filter-bar">
-          <button class="btn btn-ghost btn-sm is-on" onclick="filterInv('semua')" id="finv-semua">Semua</button>
-          <button class="btn btn-ghost btn-sm" onclick="filterInv('saham')" id="finv-saham">Saham</button>
-          <button class="btn btn-ghost btn-sm" onclick="filterInv('crypto')" id="finv-crypto">Kripto</button>
-          <button class="btn btn-ghost btn-sm" onclick="filterInv('emas')" id="finv-emas">Emas</button>
-          <button class="btn btn-ghost btn-sm" onclick="filterInv('obligasi')" id="finv-obligasi">Obligasi</button>
-          <button class="btn btn-primary btn-sm" onclick="refreshPrices()" id="btnRefresh"><i class="ti ti-refresh" aria-hidden="true"></i> Perbarui harga</button>
-        </div>
-
-        <div class="grid-2">
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title"><i class="ti ti-list i-brand" aria-hidden="true"></i> Portofolio</div>
-            </div>
-            <div class="scroll-x">
-              <table class="tbl">
-                <thead><tr><th>Aset</th><th>Kategori</th><th>Modal</th><th>Nilai kini</th><th class="ta-r">Gain / loss</th><th></th></tr></thead>
-                <tbody id="invTbl"></tbody>
-              </table>
-            </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><i class="ti ti-chart-pie i-blue" aria-hidden="true"></i> Komposisi aset</div>
           </div>
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title"><i class="ti ti-chart-bar i-violet" aria-hidden="true"></i> Alokasi per kategori</div>
-            </div>
-            <div class="chart-wrap"><canvas id="chartInv"></canvas></div>
-          </div>
+          <div class="chart-wrap"><canvas id="chartInv"></canvas></div>
         </div>
       </div>
 
       <!-- ---------- LAPORAN ---------- -->
       <div class="page" id="page-laporan">
-        <div class="filter-bar">
-          <label class="form-label" for="laporanMonth" style="margin-bottom:0">Bulan</label>
+        <div style="margin-bottom:16px">
+          <label for="laporanMonth" style="font-size:12px;color:var(--text-2)">Filter bulan (opsional)</label>
           <input type="month" class="form-control w-auto" id="laporanMonth" onchange="renderLaporan()">
-          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('laporanMonth').value='';renderLaporan()">Tampilkan semua</button>
         </div>
 
         <div class="grid-2">
@@ -239,7 +219,7 @@
           </div>
           <div class="scroll-x">
             <table class="tbl">
-              <thead><tr><th>Bulan</th><th class="ta-r">Pemasukan</th><th class="ta-r">Pengeluaran</th><th class="ta-r">Investasi</th><th class="ta-r">Saldo</th></tr></thead>
+              <thead><tr><th>Bulan</th><th style="text-align:right">Pemasukan</th><th style="text-align:right">Pengeluaran</th><th style="text-align:right">Investasi</th><th style="text-align:right">Saldo</th></tr></thead>
               <tbody id="monthlyTbl"></tbody>
             </table>
           </div>
@@ -247,11 +227,11 @@
 
         <div class="panel">
           <div class="panel-header">
-            <div class="panel-title"><i class="ti ti-arrow-up-circle i-red" aria-hidden="true"></i> Pengeluaran per kategori per bulan</div>
+            <div class="panel-title"><i class="ti ti-table i-red" aria-hidden="true"></i> Pengeluaran per kategori per bulan</div>
           </div>
           <div class="scroll-x">
             <table class="tbl">
-              <thead><tr id="rekapOutHeader"></tr></thead>
+              <thead id="rekapOutHeader"></thead>
               <tbody id="rekapOutTbl"></tbody>
             </table>
           </div>
@@ -259,11 +239,11 @@
 
         <div class="panel">
           <div class="panel-header">
-            <div class="panel-title"><i class="ti ti-arrow-down-circle i-green" aria-hidden="true"></i> Pemasukan per kategori per bulan</div>
+            <div class="panel-title"><i class="ti ti-table i-green" aria-hidden="true"></i> Pemasukan per kategori per bulan</div>
           </div>
           <div class="scroll-x">
             <table class="tbl">
-              <thead><tr id="rekapInHeader"></tr></thead>
+              <thead id="rekapInHeader"></thead>
               <tbody id="rekapInTbl"></tbody>
             </table>
           </div>
@@ -272,15 +252,29 @@
 
       <!-- ---------- KATEGORI ---------- -->
       <div class="page" id="page-kategori">
-        <div style="margin-bottom:16px">
-          <button class="btn btn-primary" onclick="openCatModal()"><i class="ti ti-plus" aria-hidden="true"></i>Tambah kategori</button>
+        <button class="btn btn-primary" onclick="openCatModal()" style="margin-bottom:24px"><i class="ti ti-plus" aria-hidden="true"></i>Tambah kategori</button>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title"><i class="ti ti-arrow-up-right i-green" aria-hidden="true"></i> Kategori pemasukan</div>
+            </div>
+            <div id="catIn"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title"><i class="ti ti-arrow-down-left i-red" aria-hidden="true"></i> Kategori pengeluaran</div>
+            </div>
+            <div id="catOut"></div>
+          </div>
         </div>
-        <div class="section-label">Pemasukan</div>
-        <div class="cat-grid" id="catIn"></div>
-        <div class="section-label">Pengeluaran</div>
-        <div class="cat-grid" id="catOut"></div>
-        <div class="section-label">Investasi</div>
-        <div class="cat-grid" id="catInv"></div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><i class="ti ti-trending-up i-blue" aria-hidden="true"></i> Kategori investasi</div>
+          </div>
+          <div id="catInv"></div>
+        </div>
       </div>
 
     </div>
@@ -289,37 +283,41 @@
 
 <!-- ================= MODAL TRANSAKSI ================= -->
 <div class="modal-bg" id="modalBg">
-  <div class="modal">
-    <div class="modal-title"><i class="ti ti-plus-circle i-brand" aria-hidden="true"></i><span id="modalTitleText">Tambah transaksi</span></div>
-
-    <div class="type-tabs">
-      <div class="type-tab active-in" id="tab-pemasukan" onclick="setType('pemasukan')"><i class="ti ti-arrow-down-circle" aria-hidden="true"></i> Pemasukan</div>
-      <div class="type-tab" id="tab-pengeluaran" onclick="setType('pengeluaran')"><i class="ti ti-arrow-up-circle" aria-hidden="true"></i> Pengeluaran</div>
-      <div class="type-tab" id="tab-investasi" onclick="setType('investasi')"><i class="ti ti-trending-up" aria-hidden="true"></i> Investasi</div>
+  <div class="modal modal-wide">
+    <div class="modal-title"><i class="ti ti-receipt-2 i-brand" aria-hidden="true"></i>Transaksi</div>
+    <div id="transMsg" class="error-msg"></div>
+    <div class="form-group">
+      <label class="form-label" for="fDate">Tanggal</label>
+      <input class="form-control" type="date" id="fDate" required>
     </div>
-
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label" for="fAmount">Jumlah (Rp)</label>
-        <input class="form-control" type="number" id="fAmount" placeholder="0" min="0">
+        <label class="form-label" for="fType">Tipe</label>
+        <select class="form-control" id="fType" onchange="onTypeChange()" required>
+          <option value="pemasukan">Pemasukan</option>
+          <option value="pengeluaran">Pengeluaran</option>
+          <option value="investasi">Investasi</option>
+        </select>
       </div>
       <div class="form-group">
-        <label class="form-label" for="fDate">Tanggal</label>
-        <input class="form-control" type="date" id="fDate">
+        <label class="form-label" for="fCat">Kategori</label>
+        <select class="form-control" id="fCat" required></select>
       </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="fCat">Kategori</label>
-      <select class="form-control" id="fCat" onchange="onCatChange()"></select>
     </div>
     <div class="form-group">
       <label class="form-label" for="fDesc">Deskripsi</label>
-      <input class="form-control" type="text" id="fDesc" placeholder="Gaji bulan Agustus">
+      <input class="form-control" type="text" id="fDesc" placeholder="Contoh: Gaji bulan Januari" required>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="fAmount">Jumlah (Rp)</label>
+        <input class="form-control" type="number" id="fAmount" placeholder="1000000" required>
+      </div>
     </div>
 
     <!-- Saham -->
     <div id="sahamExtra" class="extra-block">
-      <div class="extra-title extra-title-blue"><i class="ti ti-chart-candle" aria-hidden="true"></i> Detail saham IDX</div>
+      <div class="extra-title extra-title-blue"><i class="ti ti-chart-candle" aria-hidden="true"></i> Detail saham</div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="fKodeSaham">Kode saham</label>
@@ -419,6 +417,21 @@
 
     <!-- Investasi lain -->
     <div id="investExtra" class="extra-block">
+      <div class="extra-title extra-title-brand"><i class="ti ti-chart-line" aria-hidden="true"></i> Detail investasi</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="fBuyPrice">Harga beli (Rp)</label>
+          <input class="form-control" type="number" id="fBuyPrice" placeholder="0" oninput="updateGainPreview()">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="fCurPrice">Harga kini (Rp)</label>
+          <input class="form-control" type="number" id="fCurPrice" placeholder="0" oninput="updateGainPreview()">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="fUnits">Jumlah unit/lot</label>
+        <input class="form-control" type="number" id="fUnits" placeholder="1" step="any" oninput="updateGainPreview()">
+      </div>
       <div id="gainPreview" class="preview preview-blue"></div>
     </div>
 
@@ -434,21 +447,11 @@
   </div>
 </div>
 
-<!-- ================= MODAL ANALISA ================= -->
-<div class="modal-bg" id="analysisModalBg">
-  <div class="modal modal-wide">
-    <div class="modal-title"><i class="ti ti-robot i-brand" aria-hidden="true"></i><span id="analysisTitleText">Analisa AI</span></div>
-    <div id="analysisContent" class="analysis-body"></div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="document.getElementById('analysisModalBg').classList.remove('open')">Tutup</button>
-    </div>
-  </div>
-</div>
-
 <!-- ================= MODAL KATEGORI ================= -->
 <div class="modal-bg" id="catModalBg">
   <div class="modal modal-narrow">
     <div class="modal-title"><i class="ti ti-tag i-violet" aria-hidden="true"></i>Tambah kategori</div>
+    <div id="catMsg" class="error-msg"></div>
     <div class="form-group">
       <label class="form-label" for="cType">Tipe</label>
       <select class="form-control" id="cType">
@@ -477,7 +480,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeCatModal()">Batal</button>
-      <button class="btn btn-primary" onclick="saveCategory()"><i class="ti ti-check" aria-hidden="true"></i>Simpan</button>
+      <button class="btn btn-primary" id="saveCatBtn" onclick="saveCategory()"><i class="ti ti-check" aria-hidden="true"></i>Simpan</button>
     </div>
   </div>
 </div>
