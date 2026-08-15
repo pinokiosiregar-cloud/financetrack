@@ -11,54 +11,57 @@
 </head>
 <body>
 
-<!-- LOGIN PAGE -->
+<!-- ================= LOGIN ================= -->
 <div id="loginPage">
   <div class="login-box">
     <div class="login-logo">
-      <div class="logo-icon"><i class="ti ti-chart-pie"></i></div>
+      <div class="logo-icon"><i class="ti ti-chart-pie" aria-hidden="true"></i></div>
       <div class="logo-text">FinanceTrack</div>
-      <div class="logo-sub">Catatan Keuangan Pribadi</div>
+      <div class="logo-sub">Catatan keuangan pribadi</div>
     </div>
+
     <div id="loginForm">
       <div class="form-group">
-        <label class="form-label">Email</label>
-        <input class="form-control" type="email" id="authEmail" placeholder="email@kamu.com">
+        <label class="form-label" for="authEmail">Email</label>
+        <input class="form-control" type="email" id="authEmail" placeholder="nama@email.com" autocomplete="email">
       </div>
       <div class="form-group">
-        <label class="form-label">Password</label>
-        <input class="form-control" type="password" id="authPassword" placeholder="Password">
+        <label class="form-label" for="authPassword">Password</label>
+        <input class="form-control" type="password" id="authPassword" placeholder="Password" autocomplete="current-password">
       </div>
-      <div id="authMsg" style="font-size:13px;color:#dc2626;margin-bottom:10px;display:none"></div>
-      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="handleLogin()"><i class="ti ti-login"></i> Masuk</button>
-      <div style="text-align:center;margin-top:14px;font-size:13px;color:#718096">
-        Belum punya akun? <a href="#" onclick="showRegister()" style="color:#6366f1;font-weight:500">Daftar</a>
+      <div id="authMsg" class="auth-msg"></div>
+      <button class="btn btn-primary btn-block" onclick="handleLogin()"><i class="ti ti-login" aria-hidden="true"></i> Masuk</button>
+      <div class="auth-alt">
+        Belum punya akun? <a href="#" class="auth-link" onclick="showRegister()">Daftar</a>
       </div>
     </div>
+
     <div id="registerForm" style="display:none">
       <div class="form-group">
-        <label class="form-label">Email</label>
-        <input class="form-control" type="email" id="regEmail" placeholder="email@kamu.com">
+        <label class="form-label" for="regEmail">Email</label>
+        <input class="form-control" type="email" id="regEmail" placeholder="nama@email.com" autocomplete="email">
       </div>
       <div class="form-group">
-        <label class="form-label">Password</label>
-        <input class="form-control" type="password" id="regPassword" placeholder="Min. 6 karakter">
+        <label class="form-label" for="regPassword">Password</label>
+        <input class="form-control" type="password" id="regPassword" placeholder="Minimal 6 karakter" autocomplete="new-password">
       </div>
-      <div id="regMsg" style="font-size:13px;color:#dc2626;margin-bottom:10px;display:none"></div>
-      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="handleRegister()"><i class="ti ti-user-plus"></i> Daftar</button>
-      <div style="text-align:center;margin-top:14px;font-size:13px;color:#718096">
-        Sudah punya akun? <a href="#" onclick="showLogin()" style="color:#6366f1;font-weight:500">Masuk</a>
+      <div id="regMsg" class="auth-msg"></div>
+      <button class="btn btn-primary btn-block" onclick="handleRegister()"><i class="ti ti-user-plus" aria-hidden="true"></i> Daftar</button>
+      <div class="auth-alt">
+        Sudah punya akun? <a href="#" class="auth-link" onclick="showLogin()">Masuk</a>
       </div>
     </div>
   </div>
 </div>
 
-<!-- APP -->
+<!-- ================= APLIKASI ================= -->
 <div id="appPage" style="display:none">
   <aside id="sidebar">
     <div class="logo">
-      <div class="logo-icon"><i class="ti ti-chart-pie"></i></div>
-      <div><div class="logo-text">FinanceTrack</div><div class="logo-sub">Catatan Keuangan</div></div>
+      <div class="logo-icon"><i class="ti ti-chart-pie" aria-hidden="true"></i></div>
+      <div><div class="logo-text">FinanceTrack</div><div class="logo-sub">Catatan keuangan</div></div>
     </div>
+
     <div class="user-info">
       <div class="avatar" id="userAvatar">U</div>
       <div style="overflow:hidden">
@@ -66,18 +69,20 @@
         <div class="urole" id="userEmail">-</div>
       </div>
     </div>
+
     <nav class="nav">
-      <div class="nav-section">Dashboard</div>
-      <div class="nav-item active" onclick="showPage('dashboard',this)"><i class="ti ti-layout-dashboard"></i>Dashboard</div>
+      <div class="nav-section">Ringkasan</div>
+      <div class="nav-item active" onclick="showPage('dashboard',this)" title="Dashboard"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Dashboard</div>
       <div class="nav-section">Data</div>
-      <div class="nav-item" onclick="showPage('transaksi',this)"><i class="ti ti-list"></i>Data Transaksi</div>
-      <div class="nav-item" onclick="showPage('investasi',this)"><i class="ti ti-trending-up"></i>Investasi</div>
-      <div class="nav-item" onclick="showPage('laporan',this)"><i class="ti ti-chart-bar"></i>Laporan</div>
+      <div class="nav-item" onclick="showPage('transaksi',this)" title="Data transaksi"><i class="ti ti-list" aria-hidden="true"></i>Data transaksi</div>
+      <div class="nav-item" onclick="showPage('investasi',this)" title="Investasi"><i class="ti ti-trending-up" aria-hidden="true"></i>Investasi</div>
+      <div class="nav-item" onclick="showPage('laporan',this)" title="Laporan"><i class="ti ti-chart-bar" aria-hidden="true"></i>Laporan</div>
       <div class="nav-section">Pengaturan</div>
-      <div class="nav-item" onclick="showPage('kategori',this)"><i class="ti ti-tag"></i>Data Kategori</div>
+      <div class="nav-item" onclick="showPage('kategori',this)" title="Data kategori"><i class="ti ti-tag" aria-hidden="true"></i>Data kategori</div>
     </nav>
+
     <div class="sidebar-footer">
-      <div class="nav-item" onclick="handleLogout()" style="color:#ef4444"><i class="ti ti-logout"></i>Keluar</div>
+      <div class="nav-item nav-item-danger" onclick="handleLogout()" title="Keluar"><i class="ti ti-logout" aria-hidden="true"></i>Keluar</div>
     </div>
   </aside>
 
@@ -85,134 +90,178 @@
     <div class="header">
       <div class="header-title" id="pageTitle">Dashboard</div>
       <div class="header-right">
-        <span style="font-size:12px;color:var(--muted)" id="currentDate"></span>
-        <button class="btn btn-primary" onclick="openModal()"><i class="ti ti-plus"></i>Tambah Transaksi</button>
+        <span class="header-date" id="currentDate"></span>
+        <button class="btn btn-primary" onclick="openModal()"><i class="ti ti-plus" aria-hidden="true"></i>Tambah transaksi</button>
       </div>
     </div>
 
     <div class="content">
 
-      <!-- DASHBOARD -->
+      <!-- ---------- DASHBOARD ---------- -->
       <div class="page active" id="page-dashboard">
         <div class="period-tabs">
-          <div class="period-tab active" id="ptab-today" onclick="setPeriod('today')"><i class="ti ti-calendar-day" style="font-size:13px"></i> Hari Ini</div>
-          <div class="period-tab" id="ptab-month" onclick="setPeriod('month')"><i class="ti ti-calendar-month" style="font-size:13px"></i> Bulan Ini</div>
-          <div class="period-tab" id="ptab-year" onclick="setPeriod('year')"><i class="ti ti-calendar" style="font-size:13px"></i> Tahun Ini</div>
-          <div class="period-tab" id="ptab-all" onclick="setPeriod('all')"><i class="ti ti-infinity" style="font-size:13px"></i> Semua</div>
+          <div class="period-tab" id="ptab-today" onclick="setPeriod('today')"><i class="ti ti-calendar-day" aria-hidden="true"></i> Hari ini</div>
+          <div class="period-tab active" id="ptab-month" onclick="setPeriod('month')"><i class="ti ti-calendar-month" aria-hidden="true"></i> Bulan ini</div>
+          <div class="period-tab" id="ptab-year" onclick="setPeriod('year')"><i class="ti ti-calendar" aria-hidden="true"></i> Tahun ini</div>
+          <div class="period-tab" id="ptab-all" onclick="setPeriod('all')"><i class="ti ti-infinity" aria-hidden="true"></i> Semua</div>
         </div>
+
         <div class="cards-grid" id="dashCards"></div>
+
         <div class="grid-3">
           <div class="panel">
-            <div class="panel-header"><div class="panel-title"><i class="ti ti-chart-line" style="color:#6366f1"></i> Grafik Keuangan Per Bulan</div></div>
-            <div class="chart-wrap"><canvas id="chartLine">Grafik</canvas></div>
+            <div class="panel-header">
+              <div class="panel-title"><i class="ti ti-chart-line i-brand" aria-hidden="true"></i> Arus keuangan per bulan</div>
+            </div>
+            <div class="chart-wrap"><canvas id="chartLine"></canvas></div>
           </div>
           <div class="panel">
-            <div class="panel-header"><div class="panel-title"><i class="ti ti-chart-donut" style="color:#8b5cf6"></i> Komposisi</div></div>
-            <div class="chart-wrap"><canvas id="chartDoughnut">Komposisi</canvas></div>
+            <div class="panel-header">
+              <div class="panel-title"><i class="ti ti-flame i-red" aria-hidden="true"></i> Pengeluaran terbesar</div>
+            </div>
+            <div class="chart-wrap"><canvas id="chartDoughnut"></canvas></div>
           </div>
         </div>
+
         <div class="panel">
           <div class="panel-header">
-            <div class="panel-title"><i class="ti ti-clock" style="color:var(--amber)"></i> Transaksi Terbaru</div>
-            <button class="btn btn-ghost btn-sm" onclick="showPage('transaksi',null)">Lihat Semua</button>
+            <div class="panel-title"><i class="ti ti-clock i-amber" aria-hidden="true"></i> Transaksi terbaru</div>
+            <button class="btn btn-ghost btn-sm" onclick="showPage('transaksi',null)">Lihat semua</button>
           </div>
-          <table class="tbl">
-            <thead><tr><th>Kategori</th><th>Deskripsi</th><th>Tanggal</th><th>Tipe</th><th style="text-align:right">Jumlah</th></tr></thead>
-            <tbody id="recentTbl"></tbody>
-          </table>
+          <div class="scroll-x">
+            <table class="tbl">
+              <thead><tr><th>Kategori</th><th>Deskripsi</th><th>Tanggal</th><th>Tipe</th><th class="ta-r">Jumlah</th></tr></thead>
+              <tbody id="recentTbl"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      <!-- TRANSAKSI -->
+      <!-- ---------- TRANSAKSI ---------- -->
       <div class="page" id="page-transaksi">
-        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-          <select class="form-control" style="width:auto" id="filterType" onchange="renderTables()">
-            <option value="">Semua Tipe</option>
+        <div class="filter-bar">
+          <select class="form-control w-auto" id="filterType" onchange="renderTables()" aria-label="Saring berdasarkan tipe">
+            <option value="">Semua tipe</option>
             <option value="pemasukan">Pemasukan</option>
             <option value="pengeluaran">Pengeluaran</option>
             <option value="investasi">Investasi</option>
           </select>
-          <input type="month" class="form-control" style="width:auto" id="filterMonth" onchange="renderTables()">
-          <input type="text" class="form-control" style="width:200px" id="filterSearch" placeholder="Cari transaksi..." oninput="renderTables()">
+          <input type="month" class="form-control w-auto" id="filterMonth" onchange="renderTables()" aria-label="Saring berdasarkan bulan">
+          <input type="text" class="form-control" style="width:200px" id="filterSearch" placeholder="Cari transaksi" oninput="renderTables()" aria-label="Cari transaksi">
         </div>
         <div class="panel">
           <div class="panel-header">
-            <div class="panel-title"><i class="ti ti-list" style="color:#6366f1"></i> Semua Transaksi</div>
-            <button class="btn btn-primary btn-sm" onclick="openModal()"><i class="ti ti-plus"></i>Tambah</button>
+            <div class="panel-title"><i class="ti ti-list i-brand" aria-hidden="true"></i> Semua transaksi</div>
+            <button class="btn btn-primary btn-sm" onclick="openModal()"><i class="ti ti-plus" aria-hidden="true"></i>Tambah</button>
           </div>
-          <table class="tbl">
-            <thead><tr><th>Kategori</th><th>Deskripsi</th><th>Tanggal</th><th>Tipe</th><th>Catatan</th><th style="text-align:right">Jumlah</th><th></th></tr></thead>
-            <tbody id="fullTbl"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- INVESTASI -->
-      <div class="page" id="page-investasi">
-        <div class="cards-grid" style="grid-template-columns:repeat(3,1fr)">
-          <div class="card card-grad grad-blue"><div class="card-label"><i class="ti ti-building-bank"></i>Total Modal</div><div class="card-value" id="invModal">Rp 0</div></div>
-          <div class="card card-grad grad-teal"><div class="card-label"><i class="ti ti-trending-up"></i>Total Gain/Loss</div><div class="card-value" id="invGain">Rp 0</div></div>
-          <div class="card card-grad grad-purple"><div class="card-label"><i class="ti ti-percentage"></i>Return</div><div class="card-value" id="invReturn">0%</div></div>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-          <button class="btn btn-ghost btn-sm" onclick="filterInv('semua')" id="finv-semua" style="border-color:#6366f1;color:#6366f1">Semua</button>
-          <button class="btn btn-ghost btn-sm" onclick="filterInv('saham')" id="finv-saham">Saham</button>
-          <button class="btn btn-ghost btn-sm" onclick="filterInv('crypto')" id="finv-crypto">Crypto</button>
-          <button class="btn btn-ghost btn-sm" onclick="filterInv('emas')" id="finv-emas">Emas</button>
-          <button class="btn btn-ghost btn-sm" onclick="filterInv('obligasi')" id="finv-obligasi">Obligasi</button>
-          <button class="btn btn-primary btn-sm" onclick="refreshPrices()" id="btnRefresh"><i class="ti ti-refresh"></i> Update Harga</button>
-        </div>
-        <div class="grid-2">
-          <div class="panel">
-            <div class="panel-header"><div class="panel-title"><i class="ti ti-list" style="color:#6366f1"></i> Portofolio Investasi</div></div>
+          <div class="scroll-x">
             <table class="tbl">
-              <thead><tr><th>Aset</th><th>Kategori</th><th>Modal</th><th>Nilai Kini</th><th style="text-align:right">Gain/Loss</th><th></th></tr></thead>
-              <tbody id="invTbl"></tbody>
+              <thead><tr><th>Kategori</th><th>Deskripsi</th><th>Tanggal</th><th>Tipe</th><th>Catatan</th><th class="ta-r">Jumlah</th><th></th></tr></thead>
+              <tbody id="fullTbl"></tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- ---------- INVESTASI ---------- -->
+      <div class="page" id="page-investasi">
+        <div class="cards-grid">
+          <div class="stat stat-inv">
+            <div class="stat-label"><i class="ti ti-building-bank" aria-hidden="true"></i>Total modal</div>
+            <div class="stat-value" id="invModal">Rp 0</div>
+          </div>
+          <div class="stat stat-in">
+            <div class="stat-label"><i class="ti ti-trending-up" aria-hidden="true"></i>Gain / loss</div>
+            <div class="stat-value" id="invGain">Rp 0</div>
+          </div>
+          <div class="stat stat-purple">
+            <div class="stat-label"><i class="ti ti-percentage" aria-hidden="true"></i>Return</div>
+            <div class="stat-value" id="invReturn">0%</div>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <button class="btn btn-ghost btn-sm is-on" onclick="filterInv('semua')" id="finv-semua">Semua</button>
+          <button class="btn btn-ghost btn-sm" onclick="filterInv('saham')" id="finv-saham">Saham</button>
+          <button class="btn btn-ghost btn-sm" onclick="filterInv('crypto')" id="finv-crypto">Kripto</button>
+          <button class="btn btn-ghost btn-sm" onclick="filterInv('emas')" id="finv-emas">Emas</button>
+          <button class="btn btn-ghost btn-sm" onclick="filterInv('obligasi')" id="finv-obligasi">Obligasi</button>
+          <button class="btn btn-primary btn-sm" onclick="refreshPrices()" id="btnRefresh"><i class="ti ti-refresh" aria-hidden="true"></i> Perbarui harga</button>
+        </div>
+
+        <div class="grid-2">
           <div class="panel">
-            <div class="panel-header"><div class="panel-title"><i class="ti ti-chart-donut" style="color:#8b5cf6"></i> Alokasi Investasi</div></div>
-            <div class="chart-wrap"><canvas id="chartInv">Alokasi</canvas></div>
+            <div class="panel-header">
+              <div class="panel-title"><i class="ti ti-list i-brand" aria-hidden="true"></i> Portofolio</div>
+            </div>
+            <div class="scroll-x">
+              <table class="tbl">
+                <thead><tr><th>Aset</th><th>Kategori</th><th>Modal</th><th>Nilai kini</th><th class="ta-r">Gain / loss</th><th></th></tr></thead>
+                <tbody id="invTbl"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title"><i class="ti ti-chart-bar i-violet" aria-hidden="true"></i> Alokasi per kategori</div>
+            </div>
+            <div class="chart-wrap"><canvas id="chartInv"></canvas></div>
           </div>
         </div>
       </div>
 
-      <!-- LAPORAN -->
+      <!-- ---------- LAPORAN ---------- -->
       <div class="page" id="page-laporan">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-          <div style="font-size:14px;font-weight:600">Filter Bulan:</div>
-          <input type="month" class="form-control" style="width:auto" id="laporanMonth" onchange="renderLaporan()">
-          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('laporanMonth').value='';renderLaporan()">Reset</button>
+        <div class="filter-bar">
+          <label class="form-label" for="laporanMonth" style="margin-bottom:0">Bulan</label>
+          <input type="month" class="form-control w-auto" id="laporanMonth" onchange="renderLaporan()">
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('laporanMonth').value='';renderLaporan()">Tampilkan semua</button>
         </div>
+
         <div class="grid-2">
           <div class="panel">
-            <div class="panel-header"><div class="panel-title"><i class="ti ti-chart-bar" style="color:var(--red)"></i> Pengeluaran per Kategori</div></div>
-            <div class="chart-wrap"><canvas id="chartCat">Pengeluaran</canvas></div>
+            <div class="panel-header">
+              <div class="panel-title"><i class="ti ti-chart-bar i-red" aria-hidden="true"></i> Pengeluaran per kategori</div>
+            </div>
+            <div class="chart-wrap"><canvas id="chartCat"></canvas></div>
           </div>
           <div class="panel">
-            <div class="panel-header"><div class="panel-title"><i class="ti ti-chart-bar" style="color:var(--green)"></i> Pemasukan per Kategori</div></div>
-            <div class="chart-wrap"><canvas id="chartInCat">Pemasukan</canvas></div>
+            <div class="panel-header">
+              <div class="panel-title"><i class="ti ti-chart-bar i-green" aria-hidden="true"></i> Pemasukan per kategori</div>
+            </div>
+            <div class="chart-wrap"><canvas id="chartInCat"></canvas></div>
           </div>
         </div>
+
         <div class="panel">
-          <div class="panel-header"><div class="panel-title"><i class="ti ti-table" style="color:var(--amber)"></i> Ringkasan Bulanan</div></div>
-          <table class="tbl">
-            <thead><tr><th>Bulan</th><th style="text-align:right">Pemasukan</th><th style="text-align:right">Pengeluaran</th><th style="text-align:right">Investasi</th><th style="text-align:right">Saldo</th></tr></thead>
-            <tbody id="monthlyTbl"></tbody>
-          </table>
+          <div class="panel-header">
+            <div class="panel-title"><i class="ti ti-table i-amber" aria-hidden="true"></i> Ringkasan bulanan</div>
+          </div>
+          <div class="scroll-x">
+            <table class="tbl">
+              <thead><tr><th>Bulan</th><th class="ta-r">Pemasukan</th><th class="ta-r">Pengeluaran</th><th class="ta-r">Investasi</th><th class="ta-r">Saldo</th></tr></thead>
+              <tbody id="monthlyTbl"></tbody>
+            </table>
+          </div>
         </div>
+
         <div class="panel">
-          <div class="panel-header"><div class="panel-title"><i class="ti ti-arrow-up-circle" style="color:var(--red)"></i> Rekapan Pengeluaran per Kategori per Bulan</div></div>
-          <div style="overflow-x:auto">
+          <div class="panel-header">
+            <div class="panel-title"><i class="ti ti-arrow-up-circle i-red" aria-hidden="true"></i> Pengeluaran per kategori per bulan</div>
+          </div>
+          <div class="scroll-x">
             <table class="tbl">
               <thead><tr id="rekapOutHeader"></tr></thead>
               <tbody id="rekapOutTbl"></tbody>
             </table>
           </div>
         </div>
+
         <div class="panel">
-          <div class="panel-header"><div class="panel-title"><i class="ti ti-arrow-down-circle" style="color:var(--green)"></i> Rekapan Pemasukan per Kategori per Bulan</div></div>
-          <div style="overflow-x:auto">
+          <div class="panel-header">
+            <div class="panel-title"><i class="ti ti-arrow-down-circle i-green" aria-hidden="true"></i> Pemasukan per kategori per bulan</div>
+          </div>
+          <div class="scroll-x">
             <table class="tbl">
               <thead><tr id="rekapInHeader"></tr></thead>
               <tbody id="rekapInTbl"></tbody>
@@ -221,183 +270,187 @@
         </div>
       </div>
 
-      <!-- KATEGORI -->
+      <!-- ---------- KATEGORI ---------- -->
       <div class="page" id="page-kategori">
         <div style="margin-bottom:16px">
-          <button class="btn btn-primary" onclick="openCatModal()"><i class="ti ti-plus"></i>Tambah Kategori</button>
+          <button class="btn btn-primary" onclick="openCatModal()"><i class="ti ti-plus" aria-hidden="true"></i>Tambah kategori</button>
         </div>
-        <div style="margin-bottom:8px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Pemasukan</div>
+        <div class="section-label">Pemasukan</div>
         <div class="cat-grid" id="catIn"></div>
-        <div style="margin-bottom:8px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Pengeluaran</div>
+        <div class="section-label">Pengeluaran</div>
         <div class="cat-grid" id="catOut"></div>
-        <div style="margin-bottom:8px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Investasi</div>
+        <div class="section-label">Investasi</div>
         <div class="cat-grid" id="catInv"></div>
       </div>
+
     </div>
   </main>
 </div>
 
-<!-- MODAL TRANSAKSI -->
+<!-- ================= MODAL TRANSAKSI ================= -->
 <div class="modal-bg" id="modalBg">
   <div class="modal">
-    <div class="modal-title"><i class="ti ti-plus-circle" style="color:#6366f1"></i><span id="modalTitleText">Tambah Transaksi</span></div>
+    <div class="modal-title"><i class="ti ti-plus-circle i-brand" aria-hidden="true"></i><span id="modalTitleText">Tambah transaksi</span></div>
+
     <div class="type-tabs">
-      <div class="type-tab active-in" id="tab-pemasukan" onclick="setType('pemasukan')"><i class="ti ti-arrow-down-circle"></i> Pemasukan</div>
-      <div class="type-tab" id="tab-pengeluaran" onclick="setType('pengeluaran')"><i class="ti ti-arrow-up-circle"></i> Pengeluaran</div>
-      <div class="type-tab" id="tab-investasi" onclick="setType('investasi')"><i class="ti ti-trending-up"></i> Investasi</div>
+      <div class="type-tab active-in" id="tab-pemasukan" onclick="setType('pemasukan')"><i class="ti ti-arrow-down-circle" aria-hidden="true"></i> Pemasukan</div>
+      <div class="type-tab" id="tab-pengeluaran" onclick="setType('pengeluaran')"><i class="ti ti-arrow-up-circle" aria-hidden="true"></i> Pengeluaran</div>
+      <div class="type-tab" id="tab-investasi" onclick="setType('investasi')"><i class="ti ti-trending-up" aria-hidden="true"></i> Investasi</div>
     </div>
+
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Jumlah (Rp)</label>
+        <label class="form-label" for="fAmount">Jumlah (Rp)</label>
         <input class="form-control" type="number" id="fAmount" placeholder="0" min="0">
       </div>
       <div class="form-group">
-        <label class="form-label">Tanggal</label>
+        <label class="form-label" for="fDate">Tanggal</label>
         <input class="form-control" type="date" id="fDate">
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Kategori</label>
+      <label class="form-label" for="fCat">Kategori</label>
       <select class="form-control" id="fCat" onchange="onCatChange()"></select>
     </div>
     <div class="form-group">
-      <label class="form-label">Deskripsi</label>
-      <input class="form-control" type="text" id="fDesc" placeholder="Deskripsi singkat...">
+      <label class="form-label" for="fDesc">Deskripsi</label>
+      <input class="form-control" type="text" id="fDesc" placeholder="Gaji bulan Agustus">
     </div>
 
-    <!-- SAHAM FIELDS -->
-    <div id="sahamExtra" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
-      <div style="font-size:12px;font-weight:600;color:#2563eb;margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em">📈 Detail Saham IDX</div>
+    <!-- Saham -->
+    <div id="sahamExtra" class="extra-block">
+      <div class="extra-title extra-title-blue"><i class="ti ti-chart-candle" aria-hidden="true"></i> Detail saham IDX</div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Kode Saham</label>
-          <input class="form-control" type="text" id="fKodeSaham" placeholder="cth: BBCA" oninput="this.value=this.value.toUpperCase();updateSahamPreview()">
+          <label class="form-label" for="fKodeSaham">Kode saham</label>
+          <input class="form-control" type="text" id="fKodeSaham" placeholder="BBCA" oninput="this.value=this.value.toUpperCase();updateSahamPreview()">
         </div>
         <div class="form-group">
-          <label class="form-label">Jumlah Lot</label>
-          <input class="form-control" type="number" id="fLot" placeholder="cth: 10" oninput="updateSahamPreview()">
+          <label class="form-label" for="fLot">Jumlah lot</label>
+          <input class="form-control" type="number" id="fLot" placeholder="10" oninput="updateSahamPreview()">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Average Price (Rp/saham)</label>
-          <input class="form-control" type="number" id="fAvgPrice" placeholder="cth: 9500" oninput="updateSahamPreview()">
+          <label class="form-label" for="fAvgPrice">Harga rata-rata (Rp/saham)</label>
+          <input class="form-control" type="number" id="fAvgPrice" placeholder="9500" oninput="updateSahamPreview()">
         </div>
         <div class="form-group">
-          <label class="form-label">Current Price (Rp/saham)</label>
-          <input class="form-control" type="number" id="fCurPriceSaham" placeholder="cth: 10000" oninput="updateSahamPreview()">
+          <label class="form-label" for="fCurPriceSaham">Harga kini (Rp/saham)</label>
+          <input class="form-control" type="number" id="fCurPriceSaham" placeholder="10000" oninput="updateSahamPreview()">
         </div>
       </div>
-      <div id="sahamPreview" style="display:none;padding:12px;border-radius:8px;background:#dbeafe;color:#1e40af;font-size:13px;margin-bottom:10px;line-height:1.9"></div>
+      <div id="sahamPreview" class="preview preview-blue"></div>
     </div>
 
-    <!-- CRYPTO FIELDS -->
-    <div id="cryptoExtra" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
-      <div style="font-size:12px;font-weight:600;color:#d97706;margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em">₿ Detail Crypto</div>
+    <!-- Kripto -->
+    <div id="cryptoExtra" class="extra-block">
+      <div class="extra-title extra-title-amber"><i class="ti ti-currency-bitcoin" aria-hidden="true"></i> Detail kripto</div>
       <div class="form-group">
-        <label class="form-label">Cari Koin</label>
-        <input class="form-control" type="text" id="fCoinSearch" placeholder="cth: bitcoin, ethereum..." oninput="searchCoin()">
-        <div id="coinDropdown" style="display:none;border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;margin-top:4px;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>
+        <label class="form-label" for="fCoinSearch">Cari koin</label>
+        <input class="form-control" type="text" id="fCoinSearch" placeholder="bitcoin" oninput="searchCoin()">
+        <div id="coinDropdown" class="coin-dropdown"></div>
       </div>
-      <div id="fCoinSelected" style="display:none;padding:8px 12px;background:#fef3c7;border-radius:8px;font-size:13px;margin-bottom:12px;display:flex;align-items:center;gap:8px"></div>
+      <div id="fCoinSelected" class="coin-selected"></div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Jumlah Koin</label>
-          <input class="form-control" type="number" id="fCoinQty" placeholder="cth: 0.5" step="any" oninput="updateCryptoPreview()">
+          <label class="form-label" for="fCoinQty">Jumlah koin</label>
+          <input class="form-control" type="number" id="fCoinQty" placeholder="0.5" step="any" oninput="updateCryptoPreview()">
         </div>
         <div class="form-group">
-          <label class="form-label">Harga Beli/koin (Rp)</label>
-          <input class="form-control" type="number" id="fCoinBuyPrice" placeholder="cth: 1500000000" oninput="updateCryptoPreview()">
+          <label class="form-label" for="fCoinBuyPrice">Harga beli per koin (Rp)</label>
+          <input class="form-control" type="number" id="fCoinBuyPrice" placeholder="1500000000" oninput="updateCryptoPreview()">
         </div>
       </div>
-      <div id="cryptoPreview" style="display:none;padding:12px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:13px;margin-bottom:10px;line-height:1.9"></div>
+      <div id="cryptoPreview" class="preview preview-amber"></div>
     </div>
 
-    <!-- EMAS FIELDS -->
-    <div id="emasExtra" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
-      <div style="font-size:12px;font-weight:600;color:#d97706;margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em">🥇 Detail Emas</div>
+    <!-- Emas -->
+    <div id="emasExtra" class="extra-block">
+      <div class="extra-title extra-title-amber"><i class="ti ti-coin" aria-hidden="true"></i> Detail emas</div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Berat (gram)</label>
-          <input class="form-control" type="number" id="fGoldGram" placeholder="cth: 10" step="any" oninput="updateEmasPreview()">
+          <label class="form-label" for="fGoldGram">Berat (gram)</label>
+          <input class="form-control" type="number" id="fGoldGram" placeholder="10" step="any" oninput="updateEmasPreview()">
         </div>
         <div class="form-group">
-          <label class="form-label">Harga Beli/gram (Rp)</label>
-          <input class="form-control" type="number" id="fGoldBuyPrice" placeholder="cth: 1200000" oninput="updateEmasPreview()">
+          <label class="form-label" for="fGoldBuyPrice">Harga beli per gram (Rp)</label>
+          <input class="form-control" type="number" id="fGoldBuyPrice" placeholder="1200000" oninput="updateEmasPreview()">
         </div>
       </div>
-      <div id="emasPreview" style="display:none;padding:12px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:13px;margin-bottom:10px;line-height:1.9"></div>
+      <div id="emasPreview" class="preview preview-amber"></div>
     </div>
 
-    <!-- OBLIGASI FIELDS -->
-    <div id="obligasiExtra" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
-      <div style="font-size:12px;font-weight:600;color:#6366f1;margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em">📋 Detail Obligasi Fixed Rate</div>
+    <!-- Obligasi -->
+    <div id="obligasiExtra" class="extra-block">
+      <div class="extra-title extra-title-brand"><i class="ti ti-file-dollar" aria-hidden="true"></i> Detail obligasi fixed rate</div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Yield / Kupon Rate (% per tahun)</label>
-          <input class="form-control" type="number" id="fKuponRate" placeholder="cth: 6.89" step="0.01" oninput="updateObligasiPreview()">
+          <label class="form-label" for="fKuponRate">Kupon per tahun (%)</label>
+          <input class="form-control" type="number" id="fKuponRate" placeholder="6.89" step="0.01" oninput="updateObligasiPreview()">
         </div>
         <div class="form-group">
-          <label class="form-label">Harga Beli (%)</label>
-          <input class="form-control" type="number" id="fHargaBeliPct" placeholder="cth: 102.15" step="0.01" oninput="updateObligasiPreview()">
+          <label class="form-label" for="fHargaBeliPct">Harga beli (%)</label>
+          <input class="form-control" type="number" id="fHargaBeliPct" placeholder="102.15" step="0.01" oninput="updateObligasiPreview()">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Jumlah Unit</label>
-          <input class="form-control" type="number" id="fJumlahUnit" placeholder="cth: 30" oninput="updateObligasiPreview()">
+          <label class="form-label" for="fJumlahUnit">Jumlah unit</label>
+          <input class="form-control" type="number" id="fJumlahUnit" placeholder="30" oninput="updateObligasiPreview()">
         </div>
         <div class="form-group">
-          <label class="form-label">Tanggal Beli</label>
+          <label class="form-label" for="fTglBeli">Tanggal beli</label>
           <input class="form-control" type="date" id="fTglBeli" oninput="updateObligasiPreview()">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Tanggal Kupon Terakhir (opsional)</label>
+          <label class="form-label" for="fTglKuponTerakhir">Kupon terakhir (opsional)</label>
           <input class="form-control" type="date" id="fTglKuponTerakhir" oninput="updateObligasiPreview()">
         </div>
         <div class="form-group">
-          <label class="form-label">Tanggal Jatuh Tempo</label>
+          <label class="form-label" for="fTglJatuhTempo">Jatuh tempo</label>
           <input class="form-control" type="date" id="fTglJatuhTempo" oninput="updateObligasiPreview()">
         </div>
       </div>
-      <div id="obligasiPreview" style="display:none;padding:12px;border-radius:8px;background:#ede9fe;color:#1e293b;font-size:13px;margin-bottom:10px;line-height:2"></div>
+      <div id="obligasiPreview" class="preview preview-purple"></div>
     </div>
 
-    <!-- DEFAULT INVEST FIELDS -->
-    <div id="investExtra" style="display:none">
-      <div id="gainPreview" style="display:none;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:10px"></div>
+    <!-- Investasi lain -->
+    <div id="investExtra" class="extra-block">
+      <div id="gainPreview" class="preview preview-blue"></div>
     </div>
 
     <div class="form-group">
-      <label class="form-label">Catatan (opsional)</label>
-      <input class="form-control" type="text" id="fNote" placeholder="Catatan tambahan...">
+      <label class="form-label" for="fNote">Catatan (opsional)</label>
+      <input class="form-control" type="text" id="fNote" placeholder="Catatan tambahan">
     </div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+
+    <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
-      <button class="btn btn-primary" onclick="saveTransaction()"><i class="ti ti-check"></i>Simpan</button>
+      <button class="btn btn-primary" onclick="saveTransaction()"><i class="ti ti-check" aria-hidden="true"></i>Simpan</button>
     </div>
   </div>
 </div>
 
-<!-- MODAL ANALISA AI -->
+<!-- ================= MODAL ANALISA ================= -->
 <div class="modal-bg" id="analysisModalBg">
-  <div class="modal" style="width:560px">
-    <div class="modal-title"><i class="ti ti-robot" style="color:#6366f1"></i><span id="analysisTitleText">Analisa AI</span></div>
-    <div id="analysisContent" style="font-size:13px;line-height:1.8;max-height:400px;overflow-y:auto;white-space:pre-wrap"></div>
-    <div style="display:flex;justify-content:flex-end;margin-top:16px">
+  <div class="modal modal-wide">
+    <div class="modal-title"><i class="ti ti-robot i-brand" aria-hidden="true"></i><span id="analysisTitleText">Analisa AI</span></div>
+    <div id="analysisContent" class="analysis-body"></div>
+    <div class="modal-actions">
       <button class="btn btn-ghost" onclick="document.getElementById('analysisModalBg').classList.remove('open')">Tutup</button>
     </div>
   </div>
 </div>
 
-<!-- MODAL KATEGORI -->
+<!-- ================= MODAL KATEGORI ================= -->
 <div class="modal-bg" id="catModalBg">
-  <div class="modal" style="width:380px">
-    <div class="modal-title"><i class="ti ti-tag" style="color:#8b5cf6"></i>Tambah Kategori</div>
+  <div class="modal modal-narrow">
+    <div class="modal-title"><i class="ti ti-tag i-violet" aria-hidden="true"></i>Tambah kategori</div>
     <div class="form-group">
-      <label class="form-label">Tipe</label>
+      <label class="form-label" for="cType">Tipe</label>
       <select class="form-control" id="cType">
         <option value="pemasukan">Pemasukan</option>
         <option value="pengeluaran">Pengeluaran</option>
@@ -405,15 +458,15 @@
       </select>
     </div>
     <div class="form-group">
-      <label class="form-label">Nama Kategori</label>
-      <input class="form-control" type="text" id="cName" placeholder="Nama kategori...">
+      <label class="form-label" for="cName">Nama kategori</label>
+      <input class="form-control" type="text" id="cName" placeholder="Makan dan minum">
     </div>
     <div class="form-group">
-      <label class="form-label">Ikon (Tabler icon name)</label>
-      <input class="form-control" type="text" id="cIcon" placeholder="cth: home, coffee, car...">
+      <label class="form-label" for="cIcon">Ikon Tabler</label>
+      <input class="form-control" type="text" id="cIcon" placeholder="home">
     </div>
     <div class="form-group">
-      <label class="form-label">Warna</label>
+      <label class="form-label" for="cColor">Warna</label>
       <select class="form-control" id="cColor">
         <option value="green">Hijau</option>
         <option value="blue">Biru</option>
@@ -422,9 +475,9 @@
         <option value="amber">Kuning</option>
       </select>
     </div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+    <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeCatModal()">Batal</button>
-      <button class="btn btn-primary" onclick="saveCategory()"><i class="ti ti-check"></i>Simpan</button>
+      <button class="btn btn-primary" onclick="saveCategory()"><i class="ti ti-check" aria-hidden="true"></i>Simpan</button>
     </div>
   </div>
 </div>
