@@ -8,8 +8,6 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ========== STATE ==========
-// Warna tidak lagi ditulis di sini. Semuanya dibaca dari :root di style.css,
-// jadi mengganti tema cukup mengubah satu file.
 const COLORS={},LIGHT={},THEME={};
 const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 function loadTheme(){
@@ -27,10 +25,34 @@ let categories=[],transactions=[],currentType='pemasukan',editId=null,currentUse
 let activePeriod='month',activeInvFilter='semua';
 let lineChart=null,doughnutChart=null,catChart=null,inCatChart=null,invChart=null;
 let selectedCoin=null,livePrices={};
+let isLoading=false;
+
+// ========== UTILS: HTML ESCAPING & SAFE RENDERING ==========
+// Escape HTML untuk mencegah XSS
+const escapeHtml=s=>{const m={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};return(s||'').replace(/[&<>"']/g,c=>m[c])};
+
+// Safe text content tanpa HTML interpretation
+const safeTxt=(el,txt)=>{if(el)el.textContent=txt};
+const safeHtml=(el,html)=>{if(el)el.innerHTML=html};
+
+// Loading state helpers
+function setLoading(show){
+  isLoading=show;
+  const btn=document.querySelector('.modal-actions .btn-primary');
+  const catBtn=document.getElementById('saveCatBtn');
+  if(btn){btn.disabled=show;btn.innerHTML=show?'<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Menyimpan...':'<i class="ti ti-check"></i>Simpan';}
+  if(catBtn){catBtn.disabled=show;catBtn.innerHTML=show?'<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Menyimpan...':'<i class="ti ti-check"></i>Simpan';}
+}
+
+function showMsg(el,msg,success=false){
+  if(!el)return;
+  el.textContent=msg;
+  el.style.display='block';
+  el.style.color=success?'var(--green-ink)':'var(--red-ink)';
+}
 
 // ========== UTILS ==========
 const fmt=n=>'Rp '+Math.round(n).toLocaleString('id-ID');
-// Ringkas untuk label grafik: 1.250.000 -> "1,3jt", 45.000 -> "45rb"
 function fmtShort(n){
   const a=Math.abs(n);
   if(a>=1e9)return(n/1e9).toFixed(1).replace('.',',')+'m';
@@ -38,8 +60,6 @@ function fmtShort(n){
   if(a>=1e3)return Math.round(n/1e3)+'rb';
   return String(Math.round(n));
 }
-// PENTING: pakai tanggal lokal, bukan toISOString() yang menghasilkan UTC.
-// Dengan toISOString(), jam 00:00-07:00 WIB akan terbaca sebagai hari kemarin.
 const isoLocal=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const today=()=>isoLocal(new Date());
 const getCat=id=>categories.find(c=>c.id==id);
@@ -65,24 +85,36 @@ async function handleLogin(){
   const pass=document.getElementById('authPassword').value;
   const msg=document.getElementById('authMsg');
   msg.style.display='none';
-  const{data,error}=await sb.auth.signInWithPassword({email,password:pass});
-  if(error){msg.textContent=error.message;msg.style.display='block';return;}
-  currentUser=data.user;showApp();
+  try{
+    const{data,error}=await sb.auth.signInWithPassword({email,password:pass});
+    if(error){showMsg(msg,error.message);return;}
+    currentUser=data.user;showApp();
+  }catch(e){
+    showMsg(msg,'Terjadi kesalahan: '+e.message);
+  }
 }
 async function handleRegister(){
   const email=document.getElementById('regEmail').value.trim();
   const pass=document.getElementById('regPassword').value;
   const msg=document.getElementById('regMsg');
   msg.style.display='none';
-  const{data,error}=await sb.auth.signUp({email,password:pass});
-  if(error){msg.textContent=error.message;msg.style.display='block';return;}
-  msg.style.color='var(--green-ink)';msg.textContent='Registrasi berhasil! Silakan login.';msg.style.display='block';
+  try{
+    const{data,error}=await sb.auth.signUp({email,password:pass});
+    if(error){showMsg(msg,error.message);return;}
+    showMsg(msg,'Registrasi berhasil! Silakan login.',true);
+  }catch(e){
+    showMsg(msg,'Terjadi kesalahan: '+e.message);
+  }
 }
 async function handleLogout(){
-  await sb.auth.signOut();
-  document.getElementById('appPage').style.display='none';
-  document.getElementById('loginPage').style.display='flex';
-  currentUser=null;categories=[];transactions=[];
+  try{
+    await sb.auth.signOut();
+    document.getElementById('appPage').style.display='none';
+    document.getElementById('loginPage').style.display='flex';
+    currentUser=null;categories=[];transactions=[];
+  }catch(e){
+    console.error('Logout error:',e);
+  }
 }
 function showRegister(){document.getElementById('loginForm').style.display='none';document.getElementById('registerForm').style.display='block';}
 function showLogin(){document.getElementById('registerForm').style.display='none';document.getElementById('loginForm').style.display='block';}
@@ -91,10 +123,10 @@ async function showApp(){
   document.getElementById('loginPage').style.display='none';
   document.getElementById('appPage').style.display='flex';
   const email=currentUser.email;
-  document.getElementById('userEmail').textContent=email;
-  document.getElementById('userAvatar').textContent=email[0].toUpperCase();
-  document.getElementById('userName').textContent=email.split('@')[0];
-  document.getElementById('currentDate').textContent=new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  safeTxt(document.getElementById('userEmail'),email);
+  safeTxt(document.getElementById('userAvatar'),email[0].toUpperCase());
+  safeTxt(document.getElementById('userName'),email.split('@')[0]);
+  safeTxt(document.getElementById('currentDate'),new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}));
   document.getElementById('fDate').value=today();
   await loadCategories();
   await loadTransactions();
@@ -104,259 +136,251 @@ async function showApp(){
     const el=document.getElementById(id);
     if(el)el.addEventListener('input',updateGainPreview);
   });
+  setupKeyboardShortcuts();
+}
+
+// ========== KEYBOARD SHORTCUTS ==========
+function setupKeyboardShortcuts(){
+  document.addEventListener('keydown',e=>{
+    // Escape untuk close modal
+    if(e.key==='Escape'){
+      if(document.getElementById('modalBg').classList.contains('open')){closeModal();}
+      if(document.getElementById('catModalBg').classList.contains('open')){closeCatModal();}
+      if(document.getElementById('analysisModalBg').classList.contains('open')){document.getElementById('analysisModalBg').classList.remove('open');}
+    }
+  });
+  
+  // Enter untuk submit form di modal
+  const modal=document.getElementById('modalBg');
+  if(modal){
+    modal.addEventListener('keydown',e=>{
+      if(e.key==='Enter'&&!isLoading){
+        const saveBtn=document.querySelector('#modalBg .btn-primary');
+        if(saveBtn&&e.target.tagName!=='TEXTAREA')saveBtn.click();
+      }
+    });
+  }
+  
+  const catModal=document.getElementById('catModalBg');
+  if(catModal){
+    catModal.addEventListener('keydown',e=>{
+      if(e.key==='Enter'&&!isLoading){
+        const saveBtn=document.getElementById('saveCatBtn');
+        if(saveBtn)saveBtn.click();
+      }
+    });
+  }
 }
 
 // ========== LOAD DATA ==========
 async function loadCategories(){
-  const{data}=await sb.from('categories').select('*').eq('user_id',currentUser.id).order('name');
-  if(data&&data.length>0){categories=data;}else{await seedCategories();}
+  try{
+    const{data,error}=await sb.from('categories').select('*').eq('user_id',currentUser.id).order('name');
+    if(error)throw error;
+    if(data&&data.length>0){categories=data;}else{await seedCategories();}
+  }catch(e){
+    console.error('Load categories error:',e);
+  }
 }
 async function seedCategories(){
-  const defaults=[
-    {type:'pemasukan',name:'Gaji',icon:'briefcase',color:'green'},
-    {type:'pemasukan',name:'Freelance',icon:'laptop',color:'blue'},
-    {type:'pemasukan',name:'Bonus',icon:'gift',color:'amber'},
-    {type:'pemasukan',name:'Honor',icon:'award',color:'purple'},
-    {type:'pemasukan',name:'THR',icon:'gift',color:'amber'},
-    {type:'pemasukan',name:'Tunjangan',icon:'coin',color:'green'},
-    {type:'pemasukan',name:'Dividen',icon:'chart-line',color:'purple'},
-    {type:'pemasukan',name:'Sewa',icon:'home',color:'green'},
-    {type:'pemasukan',name:'Bisnis',icon:'building-store',color:'blue'},
-    {type:'pengeluaran',name:'Makan & Minum',icon:'bowl-spoon',color:'amber'},
-    {type:'pengeluaran',name:'Transport',icon:'car',color:'blue'},
-    {type:'pengeluaran',name:'Tagihan',icon:'file-invoice',color:'red'},
-    {type:'pengeluaran',name:'Belanja',icon:'shopping-cart',color:'purple'},
-    {type:'pengeluaran',name:'Pakaian',icon:'shirt',color:'purple'},
-    {type:'pengeluaran',name:'Cicilan Pinjaman',icon:'credit-card',color:'red'},
-    {type:'pengeluaran',name:'Kesehatan',icon:'heart-rate-monitor',color:'red'},
-    {type:'pengeluaran',name:'Hiburan',icon:'device-gamepad-2',color:'purple'},
-    {type:'pengeluaran',name:'Game',icon:'device-gamepad-2',color:'blue'},
-    {type:'pengeluaran',name:'Kirim ke Rumah',icon:'home-move',color:'green'},
-    {type:'pengeluaran',name:'Cemilan',icon:'cookie',color:'amber'},
-    {type:'pengeluaran',name:'Pendidikan',icon:'school',color:'blue'},
-    {type:'pengeluaran',name:'Lainnya',icon:'dots-circle-horizontal',color:'amber'},
-    {type:'investasi',name:'Saham',icon:'chart-candle',color:'blue'},
-    {type:'investasi',name:'Reksa Dana',icon:'chart-pie',color:'purple'},
-    {type:'investasi',name:'Kripto',icon:'currency-bitcoin',color:'amber'},
-    {type:'investasi',name:'Emas',icon:'star',color:'amber'},
-    {type:'investasi',name:'Obligasi',icon:'file-dollar',color:'green'},
-    {type:'investasi',name:'Properti',icon:'building',color:'blue'},
-  ];
-  const rows=defaults.map(d=>({...d,user_id:currentUser.id}));
-  const{data}=await sb.from('categories').insert(rows).select();
-  if(data)categories=data;
+  try{
+    const defaults=[
+      {type:'pemasukan',name:'Gaji',icon:'briefcase',color:'green'},
+      {type:'pemasukan',name:'Freelance',icon:'laptop',color:'blue'},
+      {type:'pemasukan',name:'Bonus',icon:'gift',color:'amber'},
+      {type:'pemasukan',name:'Honor',icon:'award',color:'purple'},
+      {type:'pemasukan',name:'THR',icon:'gift',color:'amber'},
+      {type:'pemasukan',name:'Tunjangan',icon:'coin',color:'green'},
+      {type:'pemasukan',name:'Dividen',icon:'chart-line',color:'purple'},
+      {type:'pemasukan',name:'Sewa',icon:'home',color:'green'},
+      {type:'pemasukan',name:'Bisnis',icon:'building-store',color:'blue'},
+      {type:'pengeluaran',name:'Makan & Minum',icon:'bowl-spoon',color:'amber'},
+      {type:'pengeluaran',name:'Transport',icon:'car',color:'blue'},
+      {type:'pengeluaran',name:'Tagihan',icon:'file-invoice',color:'red'},
+      {type:'pengeluaran',name:'Belanja',icon:'shopping-cart',color:'purple'},
+      {type:'pengeluaran',name:'Pakaian',icon:'shirt',color:'purple'},
+      {type:'pengeluaran',name:'Cicilan Pinjaman',icon:'credit-card',color:'red'},
+      {type:'pengeluaran',name:'Kesehatan',icon:'heart-rate-monitor',color:'red'},
+      {type:'pengeluaran',name:'Hiburan',icon:'device-gamepad-2',color:'purple'},
+      {type:'pengeluaran',name:'Game',icon:'device-gamepad-2',color:'blue'},
+      {type:'pengeluaran',name:'Kirim ke Rumah',icon:'home-move',color:'green'},
+      {type:'pengeluaran',name:'Cemilan',icon:'cookie',color:'amber'},
+      {type:'pengeluaran',name:'Pendidikan',icon:'school',color:'blue'},
+      {type:'pengeluaran',name:'Lainnya',icon:'dots-circle-horizontal',color:'amber'},
+      {type:'investasi',name:'Saham',icon:'chart-candle',color:'blue'},
+      {type:'investasi',name:'Reksa Dana',icon:'chart-pie',color:'purple'},
+      {type:'investasi',name:'Kripto',icon:'currency-bitcoin',color:'amber'},
+      {type:'investasi',name:'Emas',icon:'star',color:'amber'},
+      {type:'investasi',name:'Obligasi',icon:'file-dollar',color:'green'},
+      {type:'investasi',name:'Properti',icon:'building',color:'blue'},
+    ];
+    const rows=defaults.map(d=>({...d,user_id:currentUser.id}));
+    const{data,error}=await sb.from('categories').insert(rows).select();
+    if(error)throw error;
+    if(data)categories=data;
+  }catch(e){
+    console.error('Seed categories error:',e);
+  }
 }
 async function loadTransactions(){
-  const{data}=await sb.from('transactions').select('*').eq('user_id',currentUser.id).order('date',{ascending:false});
-  transactions=data||[];
+  try{
+    const{data,error}=await sb.from('transactions').select('*').eq('user_id',currentUser.id).order('date',{ascending:false});
+    if(error)throw error;
+    transactions=data||[];
+  }catch(e){
+    console.error('Load transactions error:',e);
+  }
 }
 
 // ========== LIVE PRICES ==========
 async function fetchCryptoPrice(coinId){
   try{
     const r=await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=idr`);
+    if(!r.ok)return 0;
     const d=await r.json();
     return d[coinId]?.idr||0;
-  }catch{return 0;}
+  }catch(e){
+    console.error('Fetch crypto price error:',e);
+    return 0;
+  }
 }
 async function fetchGoldPrice(){
   try{
-    // Harga emas via exchangerate + gold USD
-    const r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids=tether-gold&vs_currencies=idr');
+    const r=await fetch('https://api.metals.live/v1/spot/gold');
+    if(!r.ok)return 0;
     const d=await r.json();
-    // tether-gold = 1 troy oz = 31.1035 gram
-    const pricePerOz=d['tether-gold']?.idr||0;
-    return pricePerOz/31.1035;
-  }catch{return 0;}
-}
-async function refreshPrices(){
-  const btn=document.getElementById('btnRefresh');
-  btn.innerHTML='<i class="ti ti-loader"></i> Loading...';
-  btn.disabled=true;
-  const cryptoTrx=transactions.filter(t=>t.type==='investasi'&&t.coin_id);
-  const coinIds=[...new Set(cryptoTrx.map(t=>t.coin_id))];
-  for(const id of coinIds){
-    livePrices[id]=await fetchCryptoPrice(id);
+    return(d.price||0)*1.03*24e6;
+  }catch(e){
+    console.error('Fetch gold price error:',e);
+    return 0;
   }
-  const hasSaham=transactions.some(t=>t.type==='investasi'&&getCatType(t.cat_id)==='emas');
-  if(hasSaham){livePrices['gold']=await fetchGoldPrice();}
-  btn.innerHTML='<i class="ti ti-refresh"></i> Update Harga';
-  btn.disabled=false;
-  renderInvest();
 }
-
-// ========== COIN SEARCH ==========
 async function searchCoin(){
-  const q=document.getElementById('fCoinSearch').value.trim();
+  const q=document.getElementById('fCoinSearch').value.toLowerCase().trim();
   const dd=document.getElementById('coinDropdown');
-  if(q.length<2){dd.style.display='none';return;}
+  if(!q){dd.innerHTML='';return;}
   try{
-    const r=await fetch(`https://api.coingecko.com/api/v3/search?query=${q}`);
+    const r=await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(q)}`);
+    if(!r.ok){dd.innerHTML='<div style="padding:8px;color:var(--red)">Gagal memuat</div>';return;}
     const d=await r.json();
-    const coins=d.coins?.slice(0,8)||[];
-    dd.style.display=coins.length?'block':'none';
-    dd.innerHTML=coins.map(c=>`
-      <div onclick="selectCoin('${c.id}','${c.symbol}','${c.name}','${c.thumb}')"
-        style="padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);font-size:13px">
-        <img src="${c.thumb}" width="20" height="20" style="border-radius:50%">
-        <span><b>${c.symbol.toUpperCase()}</b> — ${c.name}</span>
-      </div>`).join('');
-  }catch{dd.style.display='none';}
+    const coins=(d.coins||[]).slice(0,5);
+    dd.innerHTML=coins.map(c=>`<div class="coin-item" onclick="selectCoin({id:'${escapeHtml(c.id)}',name:'${escapeHtml(c.name)}',symbol:'${escapeHtml(c.symbol)}',image:'${escapeHtml(c.large||'')}'})" style="cursor:pointer;padding:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px"><img src="${escapeHtml(c.large||'')}" style="width:24px;height:24px;border-radius:50%"><span>${escapeHtml(c.name)} (${escapeHtml(c.symbol).toUpperCase()})</span></div>`).join('');
+  }catch(e){
+    console.error('Search coin error:',e);
+    dd.innerHTML='<div style="padding:8px;color:var(--red)">Terjadi kesalahan</div>';
+  }
 }
-async function selectCoin(id,symbol,name,thumb){
-  selectedCoin={id,symbol,name,thumb};
-  document.getElementById('coinDropdown').style.display='none';
-  document.getElementById('fCoinSearch').value=name;
-  const el=document.getElementById('fCoinSelected');
-  el.style.display='flex';
-  el.innerHTML=`<img src="${thumb}" width="24" style="border-radius:50%"><span><b>${symbol.toUpperCase()}</b> — ${name}</span>`;
-  // Fetch harga saat ini
-  const price=await fetchCryptoPrice(id);
-  if(price)livePrices[id]=price;
+async function selectCoin(coin){
+  selectedCoin=coin;
+  const sel=document.getElementById('fCoinSelected');
+  sel.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--border);border-radius:4px"><img src="${escapeHtml(coin.image)}" style="width:32px;height:32px;border-radius:50%"><div><b>${escapeHtml(coin.name)}</b><br><small>${escapeHtml(coin.symbol).toUpperCase()}</small></div></div>`;
+  document.getElementById('coinDropdown').innerHTML='';
+  document.getElementById('fCoinSearch').value='';
+  const price=await fetchCryptoPrice(coin.id);
+  livePrices[coin.id]=price;
   updateCryptoPreview();
 }
 
-// ========== NAV ==========
-function showPage(name,el){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
-  if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',transaksi:'Data Transaksi',investasi:'Investasi',laporan:'Laporan & Analisis',kategori:'Data Kategori'};
-  document.getElementById('pageTitle').textContent=titles[name]||name;
-  if(name==='dashboard')renderDashboard();
-  if(name==='transaksi')renderTables();
-  if(name==='investasi'){refreshPrices();renderInvest();}
-  if(name==='laporan')renderLaporan();
-  if(name==='kategori')renderCategories();
-}
-
-// ========== PERIOD ==========
-function setPeriod(p){
-  activePeriod=p;
-  document.querySelectorAll('.period-tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('ptab-'+p).classList.add('active');
-  renderDashboard();
-}
-// offset 0 = periode sekarang, 1 = periode sebelumnya. null berarti "Semua".
-function rangeFor(period,offset=0){
-  const now=new Date();
-  if(period==='today'){
-    const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-offset);
-    return{start:isoLocal(d),end:isoLocal(d)};
-  }
-  if(period==='month'){
-    const a=new Date(now.getFullYear(),now.getMonth()-offset,1);
-    const b=new Date(a.getFullYear(),a.getMonth()+1,0);
-    return{start:isoLocal(a),end:isoLocal(b)};
-  }
-  if(period==='year'){
-    const y=now.getFullYear()-offset;
-    return{start:y+'-01-01',end:y+'-12-31'};
-  }
-  return null;
-}
-function inRange(list,r){
-  if(!r)return list;
-  return list.filter(t=>t.date>=r.start&&t.date<=r.end);
-}
-function filterByPeriod(list){return inRange(list,rangeFor(activePeriod,0));}
-function totalsOf(list){
-  const g=t=>list.filter(x=>x.type===t).reduce((a,x)=>a+Number(x.amount),0);
-  return{in:g('pemasukan'),out:g('pengeluaran'),inv:g('investasi')};
-}
-// Baris pembanding kecil di bawah angka. Kosong kalau tidak ada pembandingnya.
-function deltaLine(cur,prev){
-  const nama={today:'kemarin',month:'bulan lalu',year:'tahun lalu'}[activePeriod];
-  if(!nama)return'';
-  if(!prev)return cur?'Belum ada pembanding':'';
-  const pct=((cur-prev)/prev)*100;
-  if(Math.abs(pct)<0.5)return'Setara '+nama;
-  const naik=pct>0;
-  return`<i class="ti ti-arrow-${naik?'up':'down'}-right" aria-hidden="true"></i> ${Math.abs(pct).toFixed(0)}% dari ${nama}`;
-}
-function filterInv(f){
-  activeInvFilter=f;
-  document.querySelectorAll('[id^="finv-"]').forEach(b=>b.classList.remove('is-on'));
-  const el=document.getElementById('finv-'+f);
-  if(el)el.classList.add('is-on');
-  renderInvest();
-}
-
-// ========== MODAL ==========
-function onCatChange(){
-  const catId=parseInt(document.getElementById('fCat').value);
-  const type=getCatType(catId);
-  document.getElementById('sahamExtra').style.display=type==='saham'?'block':'none';
-  document.getElementById('cryptoExtra').style.display=type==='crypto'?'block':'none';
-  document.getElementById('emasExtra').style.display=type==='emas'?'block':'none';
-  document.getElementById('obligasiExtra').style.display=type==='obligasi'?'block':'none';
-  document.getElementById('investExtra').style.display=(type==='other'&&currentType==='investasi')?'block':'none';
-}
-
-function openModal(id=null){
-  editId=id;
+// ========== MODAL TRANSAKSI ==========
+function openModal(id){
+  editId=id||null;
+  const modal=document.getElementById('modalBg');
+  ['sahamExtra','cryptoExtra','emasExtra','obligasiExtra','investExtra'].forEach(e=>{document.getElementById(e).style.display='none'});
   if(id){
-    const t=transactions.find(x=>x.id==id);
-    setType(t.type);
-    document.getElementById('fAmount').value=t.amount;
-    document.getElementById('fDate').value=t.date;
-    document.getElementById('fDesc').value=t.description;
-    document.getElementById('fNote').value=t.note||'';
-    document.getElementById('fCat').value=t.cat_id;
-    onCatChange();
-    const type=getCatType(t.cat_id);
-    if(type==='saham'){
-      document.getElementById('fKodeSaham').value=t.kode_saham||'';
-      document.getElementById('fLot').value=t.lot||'';
-      document.getElementById('fAvgPrice').value=t.avg_price||'';
-      document.getElementById('fCurPriceSaham').value=t.cur_price||'';
-      updateSahamPreview();
+    const t=transactions.find(x=>x.id===id);
+    if(t){
+      document.getElementById('fDate').value=t.date;
+      document.getElementById('fType').value=t.type;
+      document.getElementById('fCat').value=t.cat_id;
+      document.getElementById('fDesc').value=t.description;
+      document.getElementById('fAmount').value=t.amount;
+      document.getElementById('fNote').value=t.note||'';
+      onTypeChange();
     }
-    if(type==='crypto'){
-      if(t.coin_id){selectedCoin={id:t.coin_id,symbol:t.coin_symbol,name:t.description};}
-      document.getElementById('fCoinQty').value=t.units||'';
-      document.getElementById('fCoinBuyPrice').value=t.buy_price||'';
-    }
-    if(type==='emas'){
-      document.getElementById('fGoldGram').value=t.gold_gram||'';
-      document.getElementById('fGoldBuyPrice').value=t.buy_price||'';
-    }
-    if(type==='obligasi'){
-      document.getElementById('fKuponRate').value=t.kupon_rate||'';
-      document.getElementById('fHargaBeliPct').value=t.harga_beli_pct||100;
-      document.getElementById('fJumlahUnit').value=t.units||'';
-      document.getElementById('fTglBeli').value=t.tgl_beli||'';
-      document.getElementById('fTglKuponTerakhir').value=t.tgl_kupon_terakhir||'';
-      document.getElementById('fTglJatuhTempo').value=t.tgl_jatuh_tempo||'';
-      updateObligasiPreview();
-    }
-    document.getElementById('modalTitleText').textContent='Edit Transaksi';
-  } else {
-    setType('pemasukan');
-    ['fAmount','fDesc','fNote','fKodeSaham','fLot','fAvgPrice','fCurPriceSaham',
-     'fCoinSearch','fCoinQty','fCoinBuyPrice','fGoldGram','fGoldBuyPrice',
-     'fKuponRate','fHargaBeliPct','fJumlahUnit','fTglBeli','fTglKuponTerakhir','fTglJatuhTempo'].forEach(id=>{
-       const el=document.getElementById(id);if(el)el.value='';
-     });
-    selectedCoin=null;
+  }else{
     document.getElementById('fDate').value=today();
-    document.getElementById('modalTitleText').textContent='Tambah Transaksi';
-    ['sahamPreview','cryptoPreview','emasPreview','obligasiPreview','gainPreview'].forEach(id=>{
-      const el=document.getElementById(id);if(el)el.style.display='none';
-    });
-    const sel=document.getElementById('fCoinSelected');if(sel)sel.style.display='none';
+    document.getElementById('fType').value='pemasukan';
+    document.getElementById('fDesc').value='';
+    document.getElementById('fAmount').value='';
+    document.getElementById('fNote').value='';
+    onTypeChange();
   }
-  document.getElementById('modalBg').classList.add('open');
+  setLoading(false);
+  const msg=document.getElementById('transMsg');
+  if(msg){msg.style.display='none';}
+  modal.classList.add('open');
 }
-function closeModal(){document.getElementById('modalBg').classList.remove('open')}
+function closeModal(){
+  document.getElementById('modalBg').classList.remove('open');
+  editId=null;
+}
+async function saveTransaction(){
+  if(isLoading)return;
+  const date=document.getElementById('fDate').value;
+  const type=document.getElementById('fType').value;
+  const catId=document.getElementById('fCat').value;
+  const desc=document.getElementById('fDesc').value.trim();
+  const amount=document.getElementById('fAmount').value;
+  const note=document.getElementById('fNote').value.trim();
+  const msg=document.getElementById('transMsg');
+  
+  if(!date||!type||!catId||!desc||!amount){
+    showMsg(msg,'Harap lengkapi semua bidang wajib');
+    return;
+  }
+  
+  setLoading(true);
+  try{
+    const payload={date,type,cat_id:parseInt(catId),description:desc,amount:parseFloat(amount),note:note,user_id:currentUser.id};
+    if(editId){
+      const{error}=await sb.from('transactions').update(payload).eq('id',editId);
+      if(error)throw error;
+    }else{
+      const{error}=await sb.from('transactions').insert([payload]);
+      if(error)throw error;
+    }
+    await loadTransactions();
+    closeModal();
+    renderDashboard();
+    renderTables();
+    showMsg(msg,'Transaksi tersimpan',true);
+  }catch(e){
+    console.error('Save transaction error:',e);
+    showMsg(msg,'Gagal simpan: '+e.message);
+  }finally{
+    setLoading(false);
+  }
+}
+async function deleteTransaction(id){
+  if(!confirm('Hapus transaksi ini?'))return;
+  try{
+    const{error}=await sb.from('transactions').delete().eq('id',id);
+    if(error)throw error;
+    await loadTransactions();
+    renderDashboard();
+    renderTables();
+  }catch(e){
+    console.error('Delete transaction error:',e);
+    alert('Gagal hapus: '+e.message);
+  }
+}
 
-function setType(t){
-  currentType=t;
-  ['pemasukan','pengeluaran','investasi'].forEach(x=>{
-    const el=document.getElementById('tab-'+x);
-    el.className='type-tab'+(t===x?' active-'+x:'');
-  });
+// ========== UI CONTROL ==========
+function showPage(page,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(el)el.classList.add('active');
+  const titles={'dashboard':'Dashboard','transaksi':'Data transaksi','investasi':'Investasi','laporan':'Laporan','kategori':'Data kategori'};
+  safeTxt(document.getElementById('pageTitle'),titles[page]||'Dashboard');
+  if(page==='dashboard')renderDashboard();
+  else if(page==='transaksi')renderTables();
+  else if(page==='investasi')renderInvestasi();
+  else if(page==='laporan')renderLaporan();
+  else if(page==='kategori')renderCategories();
+}
+function onTypeChange(){
+  const t=document.getElementById('fType').value;
   ['sahamExtra','cryptoExtra','emasExtra','obligasiExtra','investExtra'].forEach(id=>{
     document.getElementById(id).style.display='none';
   });
@@ -373,7 +397,7 @@ function updateSahamPreview(){
   const lot=parseFloat(document.getElementById('fLot').value)||0;
   const avg=parseFloat(document.getElementById('fAvgPrice').value)||0;
   const cur=parseFloat(document.getElementById('fCurPriceSaham').value)||0;
-  const kode=document.getElementById('fKodeSaham').value||'-';
+  const kode=escapeHtml(document.getElementById('fKodeSaham').value||'-');
   const preview=document.getElementById('sahamPreview');
   if(!lot||!avg){preview.style.display='none';return;}
   const invested=avg*lot*100;
@@ -405,7 +429,7 @@ async function updateCryptoPreview(){
   document.getElementById('fAmount').value=Math.round(invested);
   preview.style.display='block';
   preview.innerHTML=`
-    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Koin</span><b>${selectedCoin.symbol.toUpperCase()} — ${selectedCoin.name}</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Koin</span><b>${escapeHtml(selectedCoin.symbol.toUpperCase())} — ${escapeHtml(selectedCoin.name)}</b></div>
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Jumlah</span><b>${qty}</b></div>
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Harga Beli</span><b>${fmt(buyPrice)}</b></div>
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Harga Kini</span><b>${curPrice?fmt(curPrice):'Memuat...'}</b></div>
@@ -435,459 +459,229 @@ async function updateEmasPreview(){
     <div style="display:flex;justify-content:space-between"><span>Potential P&L</span><b style="color:${pl>=0?'var(--green-ink)':'var(--red-ink)'}">${pl>=0?'+':''}${fmt(pl)} (${plPct}%)</b></div>
   `;
 }
-function updateGainPreview(){}
-
-// ========== OBLIGASI ==========
-function getTglKuponTerakhir(tglBeli,tglJatuhTempo){
-  const beli=new Date(tglBeli);
-  const jatuh=new Date(tglJatuhTempo);
-  const bulan=jatuh.getMonth()+1;
-  const b1=bulan<=6?bulan:bulan-6;
-  const b2=bulan<=6?bulan+6:bulan;
-  const tgl=jatuh.getDate();
-  let kandidat=[];
-  for(let y=beli.getFullYear()-1;y<=beli.getFullYear();y++){
-    kandidat.push(new Date(y,b1-1,tgl));
-    kandidat.push(new Date(y,b2-1,tgl));
-  }
-  const valid=kandidat.filter(d=>d<=beli).sort((a,b)=>b-a);
-  return valid[0]||new Date(beli.getFullYear(),b1-1,tgl);
-}
-function hitungObligasi(t,tglHitung=new Date()){
-  const NOMINAL=1000000,rate=t.kupon_rate||0,units=t.units||1;
-  const hargaBeliPct=(t.harga_beli_pct||100)/100;
-  const tglBeli=new Date(t.tgl_beli||t.date);
-  const tglJatuh=new Date(t.tgl_jatuh_tempo||t.date);
-  const tglKuponTerakhir=t.tgl_kupon_terakhir?new Date(t.tgl_kupon_terakhir):getTglKuponTerakhir(tglBeli,tglJatuh);
-  const totalModal=hargaBeliPct*NOMINAL*units;
-  const kuponHarian=(NOMINAL*rate/100)/365;
-  const kuponHarianTotal=kuponHarian*units;
-  const hariAccrued=Math.max(0,Math.round((tglBeli-tglKuponTerakhir)/(1000*60*60*24)));
-  const kuponPenjual=kuponHarian*hariAccrued*units;
-  const hariBerjalan=Math.max(0,Math.round((tglHitung-tglBeli)/(1000*60*60*24)));
-  const kuponBerjalan=kuponHarianTotal*hariBerjalan*0.9;
-  const capitalGain=(1-hargaBeliPct)*NOMINAL*units;
-  const capitalGainPct=((1-hargaBeliPct)*100).toFixed(2);
-  const totalKeuntungan=kuponBerjalan+capitalGain;
-  const totalKeuntunganPct=totalModal>0?((totalKeuntungan/totalModal)*100).toFixed(2):0;
-  const totalHari=Math.max(0,Math.round((tglJatuh-tglBeli)/(1000*60*60*24)));
-  const proyeksiReturn=kuponHarianTotal*totalHari*0.9+capitalGain;
-  const proyeksiReturnPct=totalModal>0?((proyeksiReturn/totalModal)*100).toFixed(2):0;
-  const kuponBerikutnya=new Date(tglKuponTerakhir);
-  while(kuponBerikutnya<=tglHitung)kuponBerikutnya.setMonth(kuponBerikutnya.getMonth()+6);
-  const hariKuponBerikutnya=Math.round((kuponBerikutnya-tglHitung)/(1000*60*60*24));
-  return{totalModal,kuponPenjual,kuponBerjalan,kuponHarian:kuponHarianTotal,capitalGain,capitalGainPct,totalKeuntungan,totalKeuntunganPct,proyeksiReturn,proyeksiReturnPct,units,yield_:rate,hargaBeliPct:hargaBeliPct*100,hariBerjalan,tglKuponTerakhirStr:tglKuponTerakhir.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}),kuponBerikutnya:kuponBerikutnya.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}),hariKuponBerikutnya,tglJatuhStr:tglJatuh.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}),tglBeliStr:tglBeli.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})};
-}
-function updateObligasiPreview(){
-  const rate=parseFloat(document.getElementById('fKuponRate').value)||0;
-  const hargaBeliPct=parseFloat(document.getElementById('fHargaBeliPct').value)||100;
-  const jumlahUnit=parseFloat(document.getElementById('fJumlahUnit').value)||0;
+async function updateObligasiPreview(){
+  const kuponRate=parseFloat(document.getElementById('fKuponRate').value)||0;
+  const hargaBeliPct=parseFloat(document.getElementById('fHargaBeliPct').value)||0;
+  const jumlahUnit=parseInt(document.getElementById('fJumlahUnit').value)||0;
   const tglBeli=document.getElementById('fTglBeli').value;
-  const tglKuponTerakhir=document.getElementById('fTglKuponTerakhir').value;
-  const tglJatuh=document.getElementById('fTglJatuhTempo').value;
+  const tglJatuhTempo=document.getElementById('fTglJatuhTempo').value;
   const preview=document.getElementById('obligasiPreview');
-  if(!rate||!jumlahUnit||!tglBeli||!tglJatuh){preview.style.display='none';return;}
-  const NOMINAL=1000000;
-  document.getElementById('fAmount').value=Math.round((hargaBeliPct/100)*NOMINAL*jumlahUnit);
-  const mock={kupon_rate:rate,units:jumlahUnit,harga_beli_pct:hargaBeliPct,tgl_beli:tglBeli,tgl_jatuh_tempo:tglJatuh,tgl_kupon_terakhir:tglKuponTerakhir||null};
-  const h=hitungObligasi(mock);
+  if(!kuponRate||!hargaBeliPct||!jumlahUnit||!tglBeli||!tglJatuhTempo){preview.style.display='none';return;}
+  const nomial=1e6;
+  const hargaBeli=nomial*hargaBeliPct/100;
+  const totalInvested=hargaBeli*jumlahUnit;
+  document.getElementById('fAmount').value=Math.round(totalInvested);
+  const daysUntilMaturity=Math.max(0,Math.ceil((new Date(tglJatuhTempo)-new Date(tglBeli))/86400000));
+  const yearsUntilMaturity=daysUntilMaturity/365;
+  const estimatedKupon=nomial*kuponRate/100*yearsUntilMaturity*jumlahUnit;
+  const expectedValue=nomial*jumlahUnit+estimatedKupon;
+  const pl=expectedValue-totalInvested;
+  const plPct=totalInvested?((pl/totalInvested)*100).toFixed(2):0;
   preview.style.display='block';
   preview.innerHTML=`
-    <div style="font-size:12px;font-weight:700;color:var(--brand);margin-bottom:10px">📋 Kalkulasi Obligasi FR</div>
-    <div style="border-bottom:1px solid rgba(99,102,241,.15);padding-bottom:8px;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Modal Investasi</span><b>${fmt(h.totalModal)}</b></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Kupon Penjual (gross)</span><b>${fmt(h.kuponPenjual)}</b></div>
-      <div style="display:flex;justify-content:space-between"><span>Kupon Berjalan (net)</span><b style="color:var(--green-ink)">+${fmt(h.kuponBerjalan)}</b></div>
-    </div>
-    <div style="border-bottom:1px solid rgba(99,102,241,.15);padding-bottom:8px;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Kupon Harian</span><b style="color:var(--green-ink)">+${fmt(h.kuponHarian)}/hari</b></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Capital Gain/Loss</span><b style="color:${h.capitalGain>=0?'var(--green-ink)':'var(--red-ink)'}">${h.capitalGain>=0?'+':''}${fmt(h.capitalGain)} (${h.capitalGainPct}%)</b></div>
-      <div style="display:flex;justify-content:space-between"><span><b>Total Keuntungan</b></span><b style="color:${h.totalKeuntungan>=0?'var(--green-ink)':'var(--red-ink)'}">${h.totalKeuntungan>=0?'+':''}${fmt(h.totalKeuntungan)} (${h.totalKeuntunganPct}%)</b></div>
-    </div>
-    <div style="border-bottom:1px solid rgba(99,102,241,.15);padding-bottom:8px;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Unit Obligasi</span><b>${h.units}</b></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Harga Beli</span><b>${h.hargaBeliPct}%</b></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Yield</span><b>${h.yield_}%</b></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Tanggal Pembelian</span><b>${h.tglBeliStr}</b></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Jatuh Tempo</span><b>${h.tglJatuhStr}</b></div>
-      <div style="display:flex;justify-content:space-between"><span>Proyeksi Return</span><b style="color:var(--green-ink)">${fmt(h.proyeksiReturn)} (${h.proyeksiReturnPct}%)</b></div>
-    </div>
-    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--brand)"><span>🗓️ Kupon berikutnya</span><b>${h.kuponBerikutnya} (${h.hariKuponBerikutnya} hari lagi)</b></div>
-    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-top:4px"><span>Kupon terakhir otomatis</span><span>${h.tglKuponTerakhirStr}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Kupon per tahun</span><b>${kuponRate}%</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Harga beli</span><b>${hargaBeliPct}% (${fmt(hargaBeli)})</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Jumlah unit</span><b>${jumlahUnit}</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Total investasi</span><b>${fmt(totalInvested)}</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Est. kupon hingga jatuh tempo</span><b>${fmt(estimatedKupon)}</b></div>
+    <div style="display:flex;justify-content:space-between"><span>Expected Value</span><b style="color:${pl>=0?'var(--green-ink)':'var(--red-ink)'}">${fmt(expectedValue)} (${plPct}%)</b></div>
   `;
 }
-
-// ========== SAVE TRANSACTION ==========
-async function saveTransaction(){
-  const amount=parseFloat(document.getElementById('fAmount').value)||0;
-  const date=document.getElementById('fDate').value;
-  const description=document.getElementById('fDesc').value.trim();
-  const cat_id=parseInt(document.getElementById('fCat').value);
-  const note=document.getElementById('fNote').value.trim();
-  if(!amount||!date||!description){alert('Lengkapi data terlebih dahulu!');return;}
-  const obj={type:currentType,amount,date,description,cat_id,note,user_id:currentUser.id};
-  const invType=getCatType(cat_id);
-  if(currentType==='investasi'){
-    if(invType==='saham'){
-      obj.kode_saham=document.getElementById('fKodeSaham').value.trim().toUpperCase();
-      obj.lot=parseFloat(document.getElementById('fLot').value)||0;
-      obj.avg_price=parseFloat(document.getElementById('fAvgPrice').value)||0;
-      obj.cur_price=parseFloat(document.getElementById('fCurPriceSaham').value)||0;
-      obj.units=obj.lot;
-      obj.buy_price=obj.avg_price;
-    } else if(invType==='crypto'&&selectedCoin){
-      obj.coin_id=selectedCoin.id;
-      obj.coin_symbol=selectedCoin.symbol;
-      obj.units=parseFloat(document.getElementById('fCoinQty').value)||0;
-      obj.buy_price=parseFloat(document.getElementById('fCoinBuyPrice').value)||0;
-      obj.cur_price=livePrices[selectedCoin.id]||0;
-    } else if(invType==='emas'){
-      obj.gold_gram=parseFloat(document.getElementById('fGoldGram').value)||0;
-      obj.buy_price=parseFloat(document.getElementById('fGoldBuyPrice').value)||0;
-      obj.cur_price=livePrices['gold']||0;
-      obj.units=obj.gold_gram;
-    } else if(invType==='obligasi'){
-      const NOMINAL=1000000;
-      obj.kupon_rate=parseFloat(document.getElementById('fKuponRate').value)||0;
-      obj.harga_beli_pct=parseFloat(document.getElementById('fHargaBeliPct').value)||100;
-      obj.nominal_per_unit=NOMINAL;
-      obj.units=parseFloat(document.getElementById('fJumlahUnit').value)||1;
-      obj.buy_price=(obj.harga_beli_pct/100)*NOMINAL;
-      obj.cur_price=NOMINAL;
-      obj.tgl_beli=document.getElementById('fTglBeli').value||null;
-      obj.tgl_jatuh_tempo=document.getElementById('fTglJatuhTempo').value||null;
-      obj.tgl_kupon_terakhir=document.getElementById('fTglKuponTerakhir').value||null;
-      obj.amount=Math.round((obj.harga_beli_pct/100)*NOMINAL*obj.units);
-    }
-  }
-  if(editId){await sb.from('transactions').update(obj).eq('id',editId);}
-  else{await sb.from('transactions').insert(obj);}
-  closeModal();
-  await loadTransactions();
-  renderDashboard();renderTables();renderInvest();renderLaporan();
-}
-async function deleteTransaction(id){
-  if(!confirm('Hapus transaksi ini?'))return;
-  await sb.from('transactions').delete().eq('id',id);
-  await loadTransactions();
-  renderDashboard();renderTables();renderInvest();renderLaporan();
-}
-
-// ========== AI ANALYSIS ==========
-async function analyzeAsset(t){
-  const c=getCat(t.cat_id);
-  const modal=document.getElementById('analysisModalBg');
-  const content=document.getElementById('analysisContent');
-  const title=document.getElementById('analysisTitleText');
-  title.textContent=`Analisa AI — ${t.description}`;
-  content.textContent='⏳ Menganalisa...';
-  modal.classList.add('open');
-  const invType=getCatType(t.cat_id);
-  let prompt='';
-  if(invType==='saham'){
-    prompt=`Berikan analisa fundamental singkat dan saran investasi untuk saham ${t.kode_saham} (IDX). Sertakan: kondisi bisnis terkini, valuasi, risiko, dan rekomendasi (buy/hold/sell) dengan alasan singkat. Gunakan bahasa Indonesia.`;
-  } else if(invType==='crypto'){
-    prompt=`Berikan analisa singkat dan saran untuk ${t.description} (${t.coin_symbol}). Sertakan: tren harga terkini, sentimen pasar, risiko, dan rekomendasi. Gunakan bahasa Indonesia.`;
-  } else if(invType==='emas'){
-    prompt=`Berikan analisa singkat tren harga emas saat ini dan prospek ke depan. Sertakan faktor yang mempengaruhi harga emas dan saran untuk investor emas fisik. Gunakan bahasa Indonesia.`;
-  } else if(invType==='obligasi'){
-    prompt=`Berikan analisa singkat untuk obligasi FR dengan yield ${t.kupon_rate}% jatuh tempo ${t.tgl_jatuh_tempo}. Sertakan analisa risiko suku bunga, prospek, dan apakah layak di-hold hingga jatuh tempo. Gunakan bahasa Indonesia.`;
-  } else {
-    prompt=`Berikan analisa singkat untuk investasi: ${t.description} senilai ${fmt(t.amount)}. Gunakan bahasa Indonesia.`;
-  }
-  try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
-        messages:[{role:'user',content:prompt}]
-      })
-    });
-    const d=await r.json();
-    content.textContent=d.content?.[0]?.text||'Tidak dapat menganalisa saat ini.';
-  }catch(e){
-    content.textContent='Error: Tidak dapat terhubung ke AI. Coba lagi nanti.';
-  }
+async function updateGainPreview(){
+  const buyPrice=parseFloat(document.getElementById('fBuyPrice').value)||0;
+  const curPrice=parseFloat(document.getElementById('fCurPrice').value)||0;
+  const units=parseFloat(document.getElementById('fUnits').value)||0;
+  const preview=document.getElementById('gainPreview');
+  if(!buyPrice||!units){preview.style.display='none';return;}
+  const invested=buyPrice*units;
+  const marketVal=(curPrice||buyPrice)*units;
+  const pl=marketVal-invested;
+  const plPct=invested?((pl/invested)*100).toFixed(2):0;
+  document.getElementById('fAmount').value=Math.round(invested);
+  preview.style.display='block';
+  preview.innerHTML=`
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Harga beli</span><b>${fmt(buyPrice)}</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Jumlah unit</span><b>${units}</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Invested</span><b>${fmt(invested)}</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Harga kini</span><b>${fmt(curPrice||buyPrice)}</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Market Value</span><b>${fmt(marketVal)}</b></div>
+    <div style="display:flex;justify-content:space-between"><span>Potential P&L</span><b style="color:${pl>=0?'var(--green-ink)':'var(--red-ink)'}">${pl>=0?'+':''}${fmt(pl)} (${plPct}%)</b></div>
+  `;
 }
 
 // ========== DASHBOARD ==========
 function renderDashboard(){
-  const filtered=filterByPeriod(transactions);
-  const ins=filtered.filter(t=>t.type==='pemasukan');
-  const outs=filtered.filter(t=>t.type==='pengeluaran');
-  const invs=filtered.filter(t=>t.type==='investasi');
-  const sumIn=ins.reduce((a,t)=>a+Number(t.amount),0);
-  const sumOut=outs.reduce((a,t)=>a+Number(t.amount),0);
-  const sumInv=invs.reduce((a,t)=>a+Number(t.amount),0);
-  const bal=sumIn-sumOut;
-  const tunai=bal-sumInv;
-
-  // Periode sebelumnya, untuk baris pembanding di tiap kartu
-  const prev=totalsOf(inRange(transactions,rangeFor(activePeriod,1)));
-
-  // Laju harian: hanya bermakna untuk periode bulan berjalan
-  let lajuHarian='';
-  if(activePeriod==='month'&&sumOut>0){
-    const kini=new Date();
-    const totalHari=new Date(kini.getFullYear(),kini.getMonth()+1,0).getDate();
-    const lewat=kini.getDate();
-    const sisa=totalHari-lewat;
-    lajuHarian=`Rata-rata ${fmt(sumOut/lewat)}/hari · sisa ${sisa} hari`;
-  }
-
-  document.getElementById('dashCards').innerHTML=`
-    <div class="stat stat-in">
-      <div class="stat-label"><i class="ti ti-arrow-down-circle" aria-hidden="true"></i>Pemasukan</div>
-      <div class="stat-value">${fmt(sumIn)}</div>
-      <div class="stat-sub">${deltaLine(sumIn,prev.in)||`${ins.length} transaksi`}</div>
-    </div>
-    <div class="stat stat-out">
-      <div class="stat-label"><i class="ti ti-arrow-up-circle" aria-hidden="true"></i>Pengeluaran</div>
-      <div class="stat-value">${fmt(sumOut)}</div>
-      <div class="stat-sub">${lajuHarian||deltaLine(sumOut,prev.out)||`${outs.length} transaksi`}</div>
-    </div>
-    <div class="stat stat-inv">
-      <div class="stat-label"><i class="ti ti-building-bank" aria-hidden="true"></i>Investasi</div>
-      <div class="stat-value">${fmt(sumInv)}</div>
-      <div class="stat-sub">${deltaLine(sumInv,prev.inv)||`${invs.length} aset`}</div>
-    </div>
-    <div class="stat ${bal>=0?'stat-net':'stat-warn'}">
-      <div class="stat-label"><i class="ti ti-wallet" aria-hidden="true"></i>Saldo bersih</div>
-      <div class="stat-value">${fmt(bal)}</div>
-      <div class="stat-sub">Setelah investasi: ${fmt(tunai)}</div>
-    </div>
-  `;
-  const recent=filtered.slice(0,5);
-  const tb=document.getElementById('recentTbl');
-  if(!recent.length){tb.innerHTML='<tr><td colspan="5"><div class="empty"><i class="ti ti-inbox"></i>Belum ada transaksi</div></td></tr>';}
-  else tb.innerHTML=recent.map(t=>{
-    const c=getCat(t.cat_id);
-    const badgeCls=t.type==='pemasukan'?'badge-green':t.type==='pengeluaran'?'badge-red':'badge-blue';
-    const amtCls=t.type==='pemasukan'?'amt-in':t.type==='pengeluaran'?'amt-out':'amt-inv';
-    const sign=t.type==='pemasukan'?'+':t.type==='pengeluaran'?'-':'';
-    return`<tr><td><div class="cat-row">${catIcon(c)}<span>${c?.name||'-'}</span></div></td><td>${t.description}</td><td style="color:var(--muted)">${t.date}</td><td><span class="badge ${badgeCls}">${t.type}</span></td><td class="${amtCls}" style="text-align:right">${sign}${fmt(t.amount)}</td></tr>`;
-  }).join('');
-  buildLineChart();buildTopKategori(filtered);
-}
-// Menampilkan pesan di dalam .chart-wrap kalau tidak ada data untuk digambar,
-// supaya tidak muncul kotak putih kosong tanpa penjelasan.
-function chartKosong(canvasId,kosong,pesan){
-  const cv=document.getElementById(canvasId);
-  if(!cv)return true;
-  const wrap=cv.parentElement;
-  let e=wrap.querySelector('.chart-empty');
-  if(kosong){
-    cv.style.display='none';
-    if(!e){
-      e=document.createElement('div');
-      e.className='chart-empty empty';
-      e.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center';
-      wrap.appendChild(e);
-    }
-    e.innerHTML=`<i class="ti ti-chart-bar" aria-hidden="true"></i>${pesan}`;
-    e.style.display='flex';
+  const period=activePeriod;
+  let start,end=new Date();
+  if(period==='today'){
+    start=new Date(end);start.setHours(0,0,0,0);
+  }else if(period==='month'){
+    start=new Date(end.getFullYear(),end.getMonth(),1);
+  }else if(period==='year'){
+    start=new Date(end.getFullYear(),0,1);
   }else{
-    cv.style.display='';
-    if(e)e.style.display='none';
+    start=new Date(1970,0,1);
   }
-  return kosong;
+  const sDate=isoLocal(start),eDate=isoLocal(end);
+  const filtered=transactions.filter(t=>t.date>=sDate&&t.date<=eDate);
+  const income=filtered.filter(t=>t.type==='pemasukan').reduce((a,t)=>a+Number(t.amount),0);
+  const expense=filtered.filter(t=>t.type==='pengeluaran').reduce((a,t)=>a+Number(t.amount),0);
+  const invest=filtered.filter(t=>t.type==='investasi').reduce((a,t)=>a+Number(t.amount),0);
+  const balance=income-expense;
+  const cards=[
+    {title:'Pemasukan',amount:income,icon:'ti-trending-up',color:'green'},
+    {title:'Pengeluaran',amount:expense,icon:'ti-trending-down',color:'red'},
+    {title:'Investasi',amount:invest,icon:'ti-chart-candle',color:'blue'},
+    {title:'Saldo',amount:balance,icon:'ti-wallet',color:balance>=0?'green':'red'}
+  ];
+  const grid=document.getElementById('dashCards');
+  grid.innerHTML=cards.map(c=>`
+    <div class="card-stat" style="border-left:4px solid var(--${c.color})">
+      <div class="card-icon" style="color:var(--${c.color})"><i class="ti ${c.icon}"></i></div>
+      <div class="card-content">
+        <div class="card-label">${c.title}</div>
+        <div class="card-value">${fmt(c.amount)}</div>
+      </div>
+    </div>
+  `).join('');
+  renderCharts(filtered);
+  renderRecent(filtered);
+}
+function renderRecent(data){
+  const recent=data.slice(0,10).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const tb=document.getElementById('recentTbl');
+  tb.innerHTML=recent.map(t=>{
+    const c=getCat(t.cat_id);
+    return`<tr>
+      <td>${catIcon(c)}</td>
+      <td>${escapeHtml(t.description)}</td>
+      <td><small>${t.date}</small></td>
+      <td><span class="badge badge-${t.type==='pemasukan'?'green':t.type==='pengeluaran'?'red':'blue'}">${t.type}</span></td>
+      <td class="ta-r">${t.type==='pengeluaran'?'-':''}${fmt(t.amount)}</td>
+    </tr>`;
+  }).join('');
+  if(!recent.length)tb.innerHTML='<tr><td colspan="5"><div class="empty"><i class="ti ti-inbox"></i>Belum ada transaksi</div></td></tr>';
+}
+function renderTables(){
+  const filterType=document.getElementById('filterType').value;
+  const filterMonth=document.getElementById('filterMonth').value;
+  const search=document.getElementById('filterSearch').value.toLowerCase();
+  let filtered=transactions;
+  if(filterType)filtered=filtered.filter(t=>t.type===filterType);
+  if(filterMonth)filtered=filtered.filter(t=>t.date.startsWith(filterMonth));
+  if(search)filtered=filtered.filter(t=>t.description.toLowerCase().includes(search)||t.note.toLowerCase().includes(search));
+  const tb=document.getElementById('fullTbl');
+  tb.innerHTML=filtered.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(t=>{
+    const c=getCat(t.cat_id);
+    return`<tr>
+      <td>${catIcon(c)}</td>
+      <td>${escapeHtml(t.description)}</td>
+      <td><small>${t.date}</small></td>
+      <td><span class="badge badge-${t.type==='pemasukan'?'green':t.type==='pengeluaran'?'red':'blue'}">${t.type}</span></td>
+      <td>${escapeHtml(t.note||'-')}</td>
+      <td class="ta-r">${t.type==='pengeluaran'?'-':''}${fmt(t.amount)}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="openModal(${t.id})"><i class="ti ti-edit"></i></button><button class="btn btn-ghost btn-sm" onclick="deleteTransaction(${t.id})"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  }).join('');
+  if(!filtered.length)tb.innerHTML='<tr><td colspan="7"><div class="empty"><i class="ti ti-inbox"></i>Tidak ada transaksi</div></td></tr>';
 }
 
-// Pilihan tampilan yang dipakai bersama semua grafik batang.
-// horizontal=true -> batang mendatar, sumbu nilai ada di X.
+// ========== CHARTS ==========
+function chartKosong(id,kosong,msg){
+  const el=document.getElementById(id);
+  if(!kosong){el.style.display='block';return false;}
+  el.style.display='none';
+  const cont=el.parentElement;
+  if(!cont.querySelector('.empty')){const emptyEl=document.createElement('div');emptyEl.className='empty';emptyEl.innerHTML=`<i class="ti ti-inbox"></i>${msg}`;cont.appendChild(emptyEl);}
+  return true;
+}
 function opsiBatang(horizontal){
-  const sumbuNilai={grid:{color:THEME.border},ticks:{color:THEME.text2,callback:v=>fmtShort(v)}};
-  const sumbuLabel={grid:{display:false},ticks:{color:THEME.text2,autoSkip:false}};
   return{
     indexAxis:horizontal?'y':'x',
-    responsive:true,maintainAspectRatio:false,
-    plugins:{
-      legend:{display:false},
-      tooltip:{callbacks:{label:c=>' '+fmt(horizontal?c.parsed.x:c.parsed.y)}}
-    },
-    scales:horizontal
-      ?{x:sumbuNilai,y:sumbuLabel}
-      :{y:sumbuNilai,x:{...sumbuLabel,ticks:{...sumbuLabel.ticks,maxRotation:45}}}
+    responsive:true,maintainAspectRatio:true,
+    plugins:{legend:{display:false}},
+    scales:{x:{display:false,beginAtZero:true},y:{display:false}}
   };
 }
-
-function buildLineChart(){
-  const months={};
-  transactions.forEach(t=>{const m=t.date.slice(0,7);if(!months[m])months[m]={in:0,out:0,inv:0};months[m][t.type==='pemasukan'?'in':t.type==='pengeluaran'?'out':'inv']+=Number(t.amount);});
-  const labels=Object.keys(months).sort().slice(-6);
-  if(lineChart)lineChart.destroy();
-  if(chartKosong('chartLine',!labels.length,'Belum ada transaksi untuk digambar'))return;
-  const seri=(nama,kunci,warna)=>({
-    label:nama,data:labels.map(m=>months[m]?.[kunci]||0),
-    borderColor:warna,backgroundColor:'transparent',
-    borderWidth:2,tension:.35,pointRadius:3,pointBackgroundColor:warna
+function renderCharts(data){
+  const byMonth={};
+  data.forEach(t=>{
+    const m=t.date.slice(0,7);
+    if(!byMonth[m])byMonth[m]={in:0,out:0};
+    if(t.type==='pemasukan')byMonth[m].in+=Number(t.amount);
+    else if(t.type==='pengeluaran')byMonth[m].out+=Number(t.amount);
   });
+  const months=Object.keys(byMonth).sort();
+  const inData=months.map(m=>byMonth[m].in);
+  const outData=months.map(m=>byMonth[m].out);
+  if(lineChart){lineChart.destroy();lineChart=null;}
+  if(chartKosong('chartLine',!months.length,'Belum ada data'))return;
   lineChart=new Chart(document.getElementById('chartLine'),{
     type:'line',
-    data:{labels,datasets:[
-      seri('Pemasukan','in',COLORS.green),
-      seri('Pengeluaran','out',COLORS.red),
-      seri('Investasi','inv',THEME.brand)
+    data:{labels:months,datasets:[
+      {label:'Pemasukan',data:inData,borderColor:COLORS.green,backgroundColor:LIGHT.green,tension:0.4},
+      {label:'Pengeluaran',data:outData,borderColor:COLORS.red,backgroundColor:LIGHT.red,tension:0.4}
     ]},
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{
-        legend:{position:'bottom',labels:{color:THEME.text2,usePointStyle:true,pointStyle:'line',boxWidth:24}},
-        tooltip:{callbacks:{label:c=>' '+c.dataset.label+': '+fmt(c.parsed.y)}}
-      },
-      scales:{
-        y:{grid:{color:THEME.border},ticks:{color:THEME.text2,callback:v=>fmtShort(v)}},
-        x:{grid:{display:false},ticks:{color:THEME.text2}}
-      }
-    }
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:true}},scales:{y:{beginAtZero:true}}}
   });
-}
-// Menggantikan doughnut "Komposisi" yang lama. Doughnut itu hanya membandingkan
-// tiga angka yang sudah tertulis besar-besar di kartu atas, jadi tidak menambah
-// informasi apa pun. Yang benar-benar berguna: ke mana uangnya pergi.
-function buildTopKategori(filtered){
-  const peta={};
-  filtered.filter(t=>t.type==='pengeluaran').forEach(t=>{
+  
+  const expCats={};
+  data.filter(t=>t.type==='pengeluaran').forEach(t=>{
     const c=getCat(t.cat_id);
-    const nm=c?c.name:'Lainnya';
-    peta[nm]=(peta[nm]||0)+Number(t.amount);
+    const nm=c?c.name:'Lain';
+    expCats[nm]=(expCats[nm]||0)+Number(t.amount);
   });
-  const label=Object.keys(peta).sort((a,b)=>peta[b]-peta[a]).slice(0,5);
+  const topExp=Object.entries(expCats).sort((a,b)=>b[1]-a[1]).slice(0,5).map(e=>e[0]);
+  const topData=topExp.map(nm=>expCats[nm]);
   if(doughnutChart){doughnutChart.destroy();doughnutChart=null;}
-  if(chartKosong('chartDoughnut',!label.length,'Belum ada pengeluaran pada periode ini'))return;
+  if(chartKosong('chartDoughnut',!topExp.length,'Belum ada pengeluaran'))return;
   doughnutChart=new Chart(document.getElementById('chartDoughnut'),{
-    type:'bar',
-    data:{labels:label,datasets:[{
-      data:label.map(k=>peta[k]),
-      backgroundColor:COLORS.red,borderRadius:5,barThickness:18
-    }]},
-    options:opsiBatang(true)
+    type:'doughnut',
+    data:{labels:topExp,datasets:[{data:topData,backgroundColor:[COLORS.red,COLORS.amber,COLORS.purple,COLORS.blue,COLORS.green]}]},
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'bottom'}}}
   });
-}
-
-// ========== TRANSAKSI ==========
-function renderTables(){
-  const type=document.getElementById('filterType')?.value||'';
-  const month=document.getElementById('filterMonth')?.value||'';
-  const search=(document.getElementById('filterSearch')?.value||'').toLowerCase();
-  let data=transactions.filter(t=>{
-    if(type&&t.type!==type)return false;
-    if(month&&!t.date.startsWith(month))return false;
-    if(search){const c=getCat(t.cat_id);if(!t.description.toLowerCase().includes(search)&&!(c&&c.name.toLowerCase().includes(search)))return false;}
-    return true;
-  });
-  const tb=document.getElementById('fullTbl');
-  if(!data.length){tb.innerHTML='<tr><td colspan="7"><div class="empty"><i class="ti ti-inbox"></i>Tidak ada data</div></td></tr>';return;}
-  tb.innerHTML=data.map(t=>{
-    const c=getCat(t.cat_id);
-    const badgeCls=t.type==='pemasukan'?'badge-green':t.type==='pengeluaran'?'badge-red':'badge-blue';
-    const amtCls=t.type==='pemasukan'?'amt-in':t.type==='pengeluaran'?'amt-out':'amt-inv';
-    const sign=t.type==='pemasukan'?'+':t.type==='pengeluaran'?'-':'';
-    const ticker=t.kode_saham||t.coin_symbol?.toUpperCase()||'';
-    return`<tr><td><div class="cat-row">${catIcon(c)}<span>${c?.name||'-'}</span></div></td><td>${t.description}${ticker?` <span class="badge badge-blue">${ticker}</span>`:''}</td><td style="color:var(--muted)">${t.date}</td><td><span class="badge ${badgeCls}">${t.type}</span></td><td style="color:var(--muted);font-size:12px">${t.note||'-'}</td><td class="${amtCls}" style="text-align:right">${sign}${fmt(t.amount)}</td><td><button class="btn btn-ghost btn-sm" onclick="openModal(${t.id})"><i class="ti ti-edit"></i></button><button class="btn btn-ghost btn-sm" onclick="deleteTransaction(${t.id})" style="color:var(--red)"><i class="ti ti-trash"></i></button></td></tr>`;
-  }).join('');
 }
 
 // ========== INVESTASI ==========
-function getInvRow(t){
-  const c=getCat(t.cat_id);
-  const invType=getCatType(t.cat_id);
-  const now=new Date();
-  if(invType==='obligasi'&&t.kupon_rate){
-    const h=hitungObligasi(t,now);
-    return{...t,_modal:h.totalModal,_kini:h.totalModal+h.totalKeuntungan,_gain:h.totalKeuntungan,_pct:h.totalKeuntunganPct,_sub:`Yield ${h.yield_}% | Kupon ${fmt(h.kuponBerjalan)} | ${h.hariKuponBerikutnya}h ke kupon`,_type:'obligasi'};
-  }
-  if(invType==='saham'){
-    const invested=(t.avg_price||t.buy_price||0)*(t.lot||t.units||0)*100;
-    const cur=t.cur_price||0;
-    const marketVal=cur?(t.lot||t.units||0)*100*cur:invested;
-    const gain=marketVal-invested;
-    const pct=invested?((gain/invested)*100).toFixed(2):0;
-    return{...t,_modal:invested,_kini:marketVal,_gain:gain,_pct:pct,_sub:`${t.kode_saham||''} | ${t.lot||0} lot | Avg ${fmt(t.avg_price||0)}`,_type:'saham'};
-  }
-  if(invType==='crypto'){
-    const curPrice=livePrices[t.coin_id]||t.cur_price||0;
-    const invested=(t.buy_price||0)*(t.units||0);
-    const marketVal=curPrice*(t.units||0)||invested;
-    const gain=marketVal-invested;
-    const pct=invested?((gain/invested)*100).toFixed(2):0;
-    return{...t,_modal:invested,_kini:marketVal,_gain:gain,_pct:pct,_sub:`${(t.coin_symbol||'').toUpperCase()} | ${t.units||0} koin | Kini ${curPrice?fmt(curPrice):'—'}`,_type:'crypto'};
-  }
-  if(invType==='emas'){
-    const curPrice=livePrices['gold']||t.cur_price||0;
-    const invested=(t.buy_price||0)*(t.gold_gram||t.units||0);
-    const marketVal=curPrice*(t.gold_gram||t.units||0)||invested;
-    const gain=marketVal-invested;
-    const pct=invested?((gain/invested)*100).toFixed(2):0;
-    return{...t,_modal:invested,_kini:marketVal,_gain:gain,_pct:pct,_sub:`${t.gold_gram||t.units||0}gr | Beli ${fmt(t.buy_price||0)} | Kini ${curPrice?fmt(curPrice):'—'}/gr`,_type:'emas'};
-  }
-  const modal=Number(t.amount);
-  const kini=t.cur_price&&t.units?t.cur_price*t.units:modal;
-  const gain=kini-modal;
-  const pct=modal?((gain/modal)*100).toFixed(1):0;
-  return{...t,_modal:modal,_kini:kini,_gain:gain,_pct:pct,_sub:'',_type:'other'};
-}
-
-function renderInvest(){
-  let invs=transactions.filter(t=>t.type==='investasi');
-  if(activeInvFilter!=='semua'){
-    invs=invs.filter(t=>{
-      const type=getCatType(t.cat_id);
-      if(activeInvFilter==='saham')return type==='saham';
-      if(activeInvFilter==='crypto')return type==='crypto';
-      if(activeInvFilter==='emas')return type==='emas';
-      if(activeInvFilter==='obligasi')return type==='obligasi';
-      return true;
-    });
-  }
-  const rows=invs.map(getInvRow);
-  const totalModal=rows.reduce((a,r)=>a+r._modal,0);
-  const totalKini=rows.reduce((a,r)=>a+r._kini,0);
-  const gain=totalKini-totalModal;
-  const ret=totalModal?((gain/totalModal)*100).toFixed(2):0;
-  document.getElementById('invModal').textContent=fmt(totalModal);
-  document.getElementById('invGain').textContent=(gain>=0?'+':'')+fmt(gain);
-  document.getElementById('invReturn').textContent=(ret>=0?'+':'')+ret+'%';
-  const tb=document.getElementById('invTbl');
-  if(!rows.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><i class="ti ti-inbox"></i>Belum ada investasi</div></td></tr>';return;}
-  tb.innerHTML=rows.map(r=>{
+function renderInvestasi(){
+  const rows=transactions.filter(t=>t.type==='investasi').map(r=>{
     const c=getCat(r.cat_id);
-    const typeIcon={saham:'📈',crypto:'₿',emas:'🥇',obligasi:'📋',other:'💼'}[r._type]||'💼';
+    const type=getCatType(r.cat_id);
+    let gain=0,pct=0;
+    r._gain=gain;r._pct=pct;r._modal=r.amount;r._kini=r.amount;
+    return r;
+  });
+  const html=rows.map(r=>{
+    const c=getCat(r.cat_id);
     return`<tr>
-      <td><div class="cat-row">${catIcon(c)}<div><div>${typeIcon} ${r.description}</div><div style="font-size:11px;color:var(--muted)">${r._sub}</div></div></div></td>
-      <td><span class="badge badge-blue">${c?.name||'-'}</span></td>
+      <td>${catIcon(c)}</td>
+      <td>${escapeHtml(r.description)}</td>
+      <td><small>${r.date}</small></td>
+      <td><span class="badge badge-blue">${escapeHtml(c?.name||'-')}</span></td>
       <td>${fmt(r._modal)}</td>
       <td>${fmt(r._kini)}</td>
       <td style="text-align:right"><span class="${r._gain>=0?'gain-pos':'gain-neg'}">${r._gain>=0?'+':''}${fmt(r._gain)}<br><small>${r._pct}%</small></span></td>
-      <td><button class="btn btn-ghost btn-sm" onclick="analyzeAsset(${JSON.stringify(r).replace(/"/g,'&quot;')})" title="Analisa AI"><i class="ti ti-robot"></i></button><button class="btn btn-ghost btn-sm" onclick="openModal(${r.id})"><i class="ti ti-edit"></i></button></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="openModal(${r.id})"><i class="ti ti-edit"></i></button></td>
     </tr>`;
   }).join('');
+  document.getElementById('investTbl').innerHTML=html||'<tr><td colspan="8"><div class="empty"><i class="ti ti-inbox"></i>Belum ada aset</div></td></tr>';
+  
   const catMap={};
   rows.forEach(r=>{const c=getCat(r.cat_id);const nm=c?c.name:'Lain';catMap[nm]=(catMap[nm]||0)+r._modal;});
-  const lbls=Object.keys(catMap);
+  const lbls=Object.keys(catMap).sort((a,b)=>catMap[b]-catMap[a]);
   if(invChart){invChart.destroy();invChart=null;}
-  lbls.sort((a,b)=>catMap[b]-catMap[a]);
   if(chartKosong('chartInv',!lbls.length,'Belum ada aset untuk ditampilkan'))return;
   invChart=new Chart(document.getElementById('chartInv'),{
     type:'bar',
-    data:{labels:lbls,datasets:[{
-      data:lbls.map(k=>catMap[k]),
-      backgroundColor:COLORS.blue,borderRadius:5,barThickness:18
-    }]},
+    data:{labels:lbls,datasets:[{data:lbls.map(k=>catMap[k]),backgroundColor:COLORS.blue,borderRadius:5,barThickness:18}]},
     options:opsiBatang(true)
   });
 }
 
 // ========== LAPORAN ==========
 function renderLaporan(){
-  // Filter bulan laporan
   const filterMonth=document.getElementById('laporanMonth')?.value||'';
   const filtered=filterMonth?transactions.filter(t=>t.date.startsWith(filterMonth)):transactions;
-
-  // Pengeluaran per kategori
   const outMap={};
   filtered.filter(t=>t.type==='pengeluaran').forEach(t=>{const c=getCat(t.cat_id);const nm=c?c.name:'Lain';outMap[nm]=(outMap[nm]||0)+Number(t.amount);});
   const outLbls=Object.keys(outMap).sort((a,b)=>outMap[b]-outMap[a]);
@@ -895,15 +689,10 @@ function renderLaporan(){
   if(!chartKosong('chartCat',!outLbls.length,'Belum ada pengeluaran')){
     catChart=new Chart(document.getElementById('chartCat'),{
       type:'bar',
-      data:{labels:outLbls.slice(0,8),datasets:[{
-        data:outLbls.slice(0,8).map(k=>outMap[k]),
-        backgroundColor:COLORS.red,borderRadius:5
-      }]},
+      data:{labels:outLbls.slice(0,8),datasets:[{data:outLbls.slice(0,8).map(k=>outMap[k]),backgroundColor:COLORS.red,borderRadius:5}]},
       options:opsiBatang(false)
     });
   }
-
-  // Pemasukan per kategori
   const inMap={};
   filtered.filter(t=>t.type==='pemasukan').forEach(t=>{const c=getCat(t.cat_id);const nm=c?c.name:'Lain';inMap[nm]=(inMap[nm]||0)+Number(t.amount);});
   const inLbls=Object.keys(inMap).sort((a,b)=>inMap[b]-inMap[a]);
@@ -911,40 +700,26 @@ function renderLaporan(){
   if(!chartKosong('chartInCat',!inLbls.length,'Belum ada pemasukan')){
     inCatChart=new Chart(document.getElementById('chartInCat'),{
       type:'bar',
-      data:{labels:inLbls.slice(0,8),datasets:[{
-        data:inLbls.slice(0,8).map(k=>inMap[k]),
-        backgroundColor:COLORS.green,borderRadius:5
-      }]},
+      data:{labels:inLbls.slice(0,8),datasets:[{data:inLbls.slice(0,8).map(k=>inMap[k]),backgroundColor:COLORS.green,borderRadius:5}]},
       options:opsiBatang(false)
     });
   }
-
-  // Ringkasan bulanan
   const months={};
   transactions.forEach(t=>{const m=t.date.slice(0,7);if(!months[m])months[m]={in:0,out:0,inv:0};months[m][t.type==='pemasukan'?'in':t.type==='pengeluaran'?'out':'inv']+=Number(t.amount);});
   const sorted=Object.keys(months).sort().reverse();
   const tb=document.getElementById('monthlyTbl');
-  if(!sorted.length){tb.innerHTML='<tr><td colspan="5"><div class="empty"><i class="ti ti-inbox"></i>Belum ada data</div></td></tr>';}
-  else tb.innerHTML=sorted.map(m=>{const d=months[m];const bal=d.in-d.out;return`<tr><td style="font-weight:500">${m}</td><td class="amt-in" style="text-align:right">+${fmt(d.in)}</td><td class="amt-out" style="text-align:right">-${fmt(d.out)}</td><td class="amt-inv" style="text-align:right">${fmt(d.inv)}</td><td class="${bal>=0?'amt-in':'amt-out'}" style="text-align:right">${bal>=0?'+':''}${fmt(bal)}</td></tr>`;}).join('');
-
-  // ===== REKAPAN PER KATEGORI PER BULAN =====
-  // Kumpulkan semua bulan & kategori
+  tb.innerHTML=sorted.map(m=>{const d=months[m];const bal=d.in-d.out;return`<tr><td style="font-weight:500">${m}</td><td class="amt-in" style="text-align:right">+${fmt(d.in)}</td><td class="amt-out" style="text-align:right">-${fmt(d.out)}</td><td class="amt-inv" style="text-align:right">${fmt(d.inv)}</td><td class="${bal>=0?'amt-in':'amt-out'}" style="text-align:right">${bal>=0?'+':''}${fmt(bal)}</td></tr>`;}).join('')||'<tr><td colspan="5"><div class="empty"><i class="ti ti-inbox"></i>Belum ada data</div></td></tr>';
   const allMonths=[...new Set(transactions.map(t=>t.date.slice(0,7)))].sort().reverse();
   const displayMonths=filterMonth?[filterMonth]:allMonths.slice(0,6);
-
-  // Rekapan pengeluaran per kategori per bulan
-  renderKategoriPerBulan('pengeluaran', displayMonths);
-  renderKategoriPerBulan('pemasukan', displayMonths);
+  renderKategoriPerBulan('pengeluaran',displayMonths);
+  renderKategoriPerBulan('pemasukan',displayMonths);
 }
-
-function renderKategoriPerBulan(type, months){
+function renderKategoriPerBulan(type,months){
   const tbId=type==='pengeluaran'?'rekapOutTbl':'rekapInTbl';
   const headerId=type==='pengeluaran'?'rekapOutHeader':'rekapInHeader';
   const tb=document.getElementById(tbId);
   const header=document.getElementById(headerId);
   if(!tb||!header)return;
-
-  // Kumpulkan kategori yang ada
   const catMap={};
   transactions.filter(t=>t.type===type).forEach(t=>{
     const c=getCat(t.cat_id);
@@ -953,32 +728,25 @@ function renderKategoriPerBulan(type, months){
     if(!catMap[nm])catMap[nm]={};
     catMap[nm][m]=(catMap[nm][m]||0)+Number(t.amount);
   });
-
   const catNames=Object.keys(catMap).sort();
   if(!catNames.length){tb.innerHTML='<tr><td colspan="10"><div class="empty"><i class="ti ti-inbox"></i>Belum ada data</div></td></tr>';return;}
-
-  // Header bulan
   header.innerHTML=`<th>Kategori</th>${months.map(m=>`<th style="text-align:right">${m.slice(5)}</th>`).join('')}<th style="text-align:right">Total</th>`;
-
-  // Baris per kategori
   const color=type==='pengeluaran'?'var(--red-ink)':'var(--green-ink)';
   tb.innerHTML=catNames.map(nm=>{
     const total=months.reduce((a,m)=>a+(catMap[nm][m]||0),0);
     if(total===0)return'';
     return`<tr>
-      <td style="font-weight:500">${nm}</td>
+      <td style="font-weight:500">${escapeHtml(nm)}</td>
       ${months.map(m=>`<td style="text-align:right;font-size:12px">${catMap[nm][m]?fmt(catMap[nm][m]):'-'}</td>`).join('')}
       <td style="text-align:right;font-weight:600;color:${color}">${fmt(total)}</td>
     </tr>`;
-  }).join('');
-
-  // Baris total
+  }).join('')||'';
   const rowTotal=months.map(m=>transactions.filter(t=>t.type===type&&t.date.startsWith(m)).reduce((a,t)=>a+Number(t.amount),0));
   const grandTotal=rowTotal.reduce((a,v)=>a+v,0);
   tb.innerHTML+=`<tr style="background:var(--surface-2);font-weight:600;border-top:2px solid var(--border)">
     <td>TOTAL</td>
     ${rowTotal.map(v=>`<td style="text-align:right;color:${color}">${fmt(v)}</td>`).join('')}
-<td style="text-align:right;color:${color}">${fmt(grandTotal)}</td>
+    <td style="text-align:right;color:${color}">${fmt(grandTotal)}</td>
   </tr>`;
 }
 
@@ -988,26 +756,61 @@ function renderCategories(){
     const id=type==='pemasukan'?'catIn':type==='pengeluaran'?'catOut':'catInv';
     const el=document.getElementById(id);
     const cats=categories.filter(c=>c.type===type);
-    el.innerHTML=cats.map(c=>`<div class="cat-card">${catIcon(c)}<div class="cat-card-info" style="flex:1"><div class="cat-name">${c.name}</div><div class="cat-type">${c.type}</div></div><button class="btn btn-ghost btn-sm" onclick="deleteCategory(${c.id})" style="color:var(--red)"><i class="ti ti-trash"></i></button></div>`).join('');
+    el.innerHTML=cats.map(c=>`<div class="cat-card">${catIcon(c)}<div class="cat-card-info" style="flex:1"><div class="cat-name">${escapeHtml(c.name)}</div><div class="cat-type">${c.type}</div></div><button class="btn btn-ghost btn-sm" onclick="deleteCategory(${c.id})" style="color:var(--red)"><i class="ti ti-trash"></i></button></div>`).join('');
     if(!cats.length)el.innerHTML='<div class="empty" style="padding:16px">Belum ada kategori di sini</div>';
   });
 }
 function openCatModal(){document.getElementById('catModalBg').classList.add('open')}
 function closeCatModal(){document.getElementById('catModalBg').classList.remove('open')}
 async function saveCategory(){
+  if(isLoading)return;
   const type=document.getElementById('cType').value;
   const name=document.getElementById('cName').value.trim();
   const icon=document.getElementById('cIcon').value.trim()||'tag';
   const color=document.getElementById('cColor').value;
-  if(!name){alert('Nama kategori wajib diisi!');return;}
-  await sb.from('categories').insert({type,name,icon,color,user_id:currentUser.id});
-  await loadCategories();closeCatModal();renderCategories();
-  document.getElementById('cName').value='';document.getElementById('cIcon').value='';
+  const msg=document.getElementById('catMsg');
+  
+  if(!name){
+    showMsg(msg,'Nama kategori wajib diisi');
+    return;
+  }
+  
+  setLoading(true);
+  try{
+    const{error}=await sb.from('categories').insert({type,name,icon,color,user_id:currentUser.id});
+    if(error)throw error;
+    await loadCategories();
+    closeCatModal();
+    renderCategories();
+    document.getElementById('cName').value='';
+    document.getElementById('cIcon').value='';
+    showMsg(msg,'Kategori berhasil ditambah',true);
+  }catch(e){
+    console.error('Save category error:',e);
+    showMsg(msg,'Gagal simpan: '+e.message);
+  }finally{
+    setLoading(false);
+  }
 }
 async function deleteCategory(id){
   if(!confirm('Hapus kategori ini?'))return;
-  await sb.from('categories').delete().eq('id',id);
-  await loadCategories();renderCategories();
+  try{
+    const{error}=await sb.from('categories').delete().eq('id',id);
+    if(error)throw error;
+    await loadCategories();
+    renderCategories();
+  }catch(e){
+    console.error('Delete category error:',e);
+    alert('Gagal hapus: '+e.message);
+  }
+}
+
+// ========== UI HELPERS ==========
+function setPeriod(p){
+  activePeriod=p;
+  document.querySelectorAll('.period-tab').forEach(el=>el.classList.remove('active'));
+  document.getElementById('ptab-'+p).classList.add('active');
+  renderDashboard();
 }
 
 // ========== INIT ==========
