@@ -8,21 +8,45 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ========== STATE ==========
-const COLORS={green:'#16a34a',blue:'#2563eb',red:'#dc2626',purple:'#7c3aed',amber:'#d97706'};
-const LIGHT={green:'#dcfce7',blue:'#dbeafe',red:'#fee2e2',purple:'#ede9fe',amber:'#fef3c7'};
+// Warna tidak lagi ditulis di sini. Semuanya dibaca dari :root di style.css,
+// jadi mengganti tema cukup mengubah satu file.
+const COLORS={},LIGHT={},THEME={};
+const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function loadTheme(){
+  ['green','blue','red','purple','amber'].forEach(k=>{
+    COLORS[k]=cssVar('--'+k); LIGHT[k]=cssVar('--'+k+'-soft');
+  });
+  THEME.brand=cssVar('--brand');
+  THEME.text2=cssVar('--text-2');
+  THEME.text3=cssVar('--text-3');
+  THEME.border=cssVar('--border');
+  THEME.surface=cssVar('--surface');
+}
+loadTheme();
 let categories=[],transactions=[],currentType='pemasukan',editId=null,currentUser=null;
-let activePeriod='today',activeInvFilter='semua';
+let activePeriod='month',activeInvFilter='semua';
 let lineChart=null,doughnutChart=null,catChart=null,inCatChart=null,invChart=null;
 let selectedCoin=null,livePrices={};
 
 // ========== UTILS ==========
 const fmt=n=>'Rp '+Math.round(n).toLocaleString('id-ID');
-const today=()=>new Date().toISOString().split('T')[0];
+// Ringkas untuk label grafik: 1.250.000 -> "1,3jt", 45.000 -> "45rb"
+function fmtShort(n){
+  const a=Math.abs(n);
+  if(a>=1e9)return(n/1e9).toFixed(1).replace('.',',')+'m';
+  if(a>=1e6)return(n/1e6).toFixed(1).replace('.',',')+'jt';
+  if(a>=1e3)return Math.round(n/1e3)+'rb';
+  return String(Math.round(n));
+}
+// PENTING: pakai tanggal lokal, bukan toISOString() yang menghasilkan UTC.
+// Dengan toISOString(), jam 00:00-07:00 WIB akan terbaca sebagai hari kemarin.
+const isoLocal=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const today=()=>isoLocal(new Date());
 const getCat=id=>categories.find(c=>c.id==id);
-function catColor(c){return COLORS[c?.color]||'#888'}
-function catBg(c){return LIGHT[c?.color]||'#eee'}
+function catColor(c){return COLORS[c?.color]||'var(--text-3)'}
+function catBg(c){return LIGHT[c?.color]||'var(--border)'}
 function catIcon(c){
-  if(!c)return'<div class="cat-icon" style="background:#eee"><i class="ti ti-tag"></i></div>';
+  if(!c)return'<div class="cat-icon" style="background:var(--border)"><i class="ti ti-tag"></i></div>';
   return`<div class="cat-icon" style="background:${catBg(c)};color:${catColor(c)}"><i class="ti ti-${c.icon}"></i></div>`;
 }
 function getCatType(catId){
@@ -52,7 +76,7 @@ async function handleRegister(){
   msg.style.display='none';
   const{data,error}=await sb.auth.signUp({email,password:pass});
   if(error){msg.textContent=error.message;msg.style.display='block';return;}
-  msg.style.color='#16a34a';msg.textContent='Registrasi berhasil! Silakan login.';msg.style.display='block';
+  msg.style.color='var(--green-ink)';msg.textContent='Registrasi berhasil! Silakan login.';msg.style.display='block';
 }
 async function handleLogout(){
   await sb.auth.signOut();
@@ -74,7 +98,8 @@ async function showApp(){
   document.getElementById('fDate').value=today();
   await loadCategories();
   await loadTransactions();
-  renderDashboard();
+  loadTheme();
+  setPeriod(activePeriod);
   ['fBuyPrice','fCurPrice','fUnits'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.addEventListener('input',updateGainPreview);
@@ -172,7 +197,7 @@ async function searchCoin(){
     dd.style.display=coins.length?'block':'none';
     dd.innerHTML=coins.map(c=>`
       <div onclick="selectCoin('${c.id}','${c.symbol}','${c.name}','${c.thumb}')"
-        style="padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f1f5f9;font-size:13px">
+        style="padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);font-size:13px">
         <img src="${c.thumb}" width="20" height="20" style="border-radius:50%">
         <span><b>${c.symbol.toUpperCase()}</b> — ${c.name}</span>
       </div>`).join('');
@@ -213,23 +238,48 @@ function setPeriod(p){
   document.getElementById('ptab-'+p).classList.add('active');
   renderDashboard();
 }
-function filterByPeriod(list){
+// offset 0 = periode sekarang, 1 = periode sebelumnya. null berarti "Semua".
+function rangeFor(period,offset=0){
   const now=new Date();
-  const todayStr=now.toISOString().split('T')[0];
-  const monthStr=todayStr.slice(0,7);
-  const yearStr=todayStr.slice(0,4);
-  return list.filter(t=>{
-    if(activePeriod==='today')return t.date===todayStr;
-    if(activePeriod==='month')return t.date.startsWith(monthStr);
-    if(activePeriod==='year')return t.date.startsWith(yearStr);
-    return true;
-  });
+  if(period==='today'){
+    const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-offset);
+    return{start:isoLocal(d),end:isoLocal(d)};
+  }
+  if(period==='month'){
+    const a=new Date(now.getFullYear(),now.getMonth()-offset,1);
+    const b=new Date(a.getFullYear(),a.getMonth()+1,0);
+    return{start:isoLocal(a),end:isoLocal(b)};
+  }
+  if(period==='year'){
+    const y=now.getFullYear()-offset;
+    return{start:y+'-01-01',end:y+'-12-31'};
+  }
+  return null;
+}
+function inRange(list,r){
+  if(!r)return list;
+  return list.filter(t=>t.date>=r.start&&t.date<=r.end);
+}
+function filterByPeriod(list){return inRange(list,rangeFor(activePeriod,0));}
+function totalsOf(list){
+  const g=t=>list.filter(x=>x.type===t).reduce((a,x)=>a+Number(x.amount),0);
+  return{in:g('pemasukan'),out:g('pengeluaran'),inv:g('investasi')};
+}
+// Baris pembanding kecil di bawah angka. Kosong kalau tidak ada pembandingnya.
+function deltaLine(cur,prev){
+  const nama={today:'kemarin',month:'bulan lalu',year:'tahun lalu'}[activePeriod];
+  if(!nama)return'';
+  if(!prev)return cur?'Belum ada pembanding':'';
+  const pct=((cur-prev)/prev)*100;
+  if(Math.abs(pct)<0.5)return'Setara '+nama;
+  const naik=pct>0;
+  return`<i class="ti ti-arrow-${naik?'up':'down'}-right" aria-hidden="true"></i> ${Math.abs(pct).toFixed(0)}% dari ${nama}`;
 }
 function filterInv(f){
   activeInvFilter=f;
-  document.querySelectorAll('[id^="finv-"]').forEach(b=>{b.style.borderColor='';b.style.color='';});
+  document.querySelectorAll('[id^="finv-"]').forEach(b=>b.classList.remove('is-on'));
   const el=document.getElementById('finv-'+f);
-  if(el){el.style.borderColor='#6366f1';el.style.color='#6366f1';}
+  if(el)el.classList.add('is-on');
   renderInvest();
 }
 
@@ -339,7 +389,7 @@ function updateSahamPreview(){
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Current Price</span><b>${cur?fmt(cur):'-'}</b></div>
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Invested</span><b>${fmt(invested)}</b></div>
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Market Value</span><b>${fmt(marketVal)}</b></div>
-    <div style="display:flex;justify-content:space-between"><span>Potential P&L</span><b style="color:${pl>=0?'#16a34a':'#dc2626'}">${pl>=0?'+':''}${fmt(pl)} (${plPct}%)</b></div>
+    <div style="display:flex;justify-content:space-between"><span>Potential P&L</span><b style="color:${pl>=0?'var(--green-ink)':'var(--red-ink)'}">${pl>=0?'+':''}${fmt(pl)} (${plPct}%)</b></div>
   `;
 }
 async function updateCryptoPreview(){
@@ -361,7 +411,7 @@ async function updateCryptoPreview(){
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Harga Kini</span><b>${curPrice?fmt(curPrice):'Memuat...'}</b></div>
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Invested</span><b>${fmt(invested)}</b></div>
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Market Value</span><b>${fmt(marketVal)}</b></div>
-    <div style="display:flex;justify-content:space-between"><span>Potential P&L</span><b style="color:${pl>=0?'#16a34a':'#dc2626'}">${pl>=0?'+':''}${fmt(pl)} (${plPct}%)</b></div>
+    <div style="display:flex;justify-content:space-between"><span>Potential P&L</span><b style="color:${pl>=0?'var(--green-ink)':'var(--red-ink)'}">${pl>=0?'+':''}${fmt(pl)} (${plPct}%)</b></div>
   `;
 }
 async function updateEmasPreview(){
@@ -382,7 +432,7 @@ async function updateEmasPreview(){
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Harga Kini/gram</span><b>${curPrice?fmt(curPrice):'Memuat...'}</b></div>
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Invested</span><b>${fmt(invested)}</b></div>
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Market Value</span><b>${fmt(marketVal)}</b></div>
-    <div style="display:flex;justify-content:space-between"><span>Potential P&L</span><b style="color:${pl>=0?'#16a34a':'#dc2626'}">${pl>=0?'+':''}${fmt(pl)} (${plPct}%)</b></div>
+    <div style="display:flex;justify-content:space-between"><span>Potential P&L</span><b style="color:${pl>=0?'var(--green-ink)':'var(--red-ink)'}">${pl>=0?'+':''}${fmt(pl)} (${plPct}%)</b></div>
   `;
 }
 function updateGainPreview(){}
@@ -443,16 +493,16 @@ function updateObligasiPreview(){
   const h=hitungObligasi(mock);
   preview.style.display='block';
   preview.innerHTML=`
-    <div style="font-size:12px;font-weight:700;color:#6366f1;margin-bottom:10px">📋 Kalkulasi Obligasi FR</div>
+    <div style="font-size:12px;font-weight:700;color:var(--brand);margin-bottom:10px">📋 Kalkulasi Obligasi FR</div>
     <div style="border-bottom:1px solid rgba(99,102,241,.15);padding-bottom:8px;margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Modal Investasi</span><b>${fmt(h.totalModal)}</b></div>
       <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Kupon Penjual (gross)</span><b>${fmt(h.kuponPenjual)}</b></div>
-      <div style="display:flex;justify-content:space-between"><span>Kupon Berjalan (net)</span><b style="color:#16a34a">+${fmt(h.kuponBerjalan)}</b></div>
+      <div style="display:flex;justify-content:space-between"><span>Kupon Berjalan (net)</span><b style="color:var(--green-ink)">+${fmt(h.kuponBerjalan)}</b></div>
     </div>
     <div style="border-bottom:1px solid rgba(99,102,241,.15);padding-bottom:8px;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Kupon Harian</span><b style="color:#16a34a">+${fmt(h.kuponHarian)}/hari</b></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Capital Gain/Loss</span><b style="color:${h.capitalGain>=0?'#16a34a':'#dc2626'}">${h.capitalGain>=0?'+':''}${fmt(h.capitalGain)} (${h.capitalGainPct}%)</b></div>
-      <div style="display:flex;justify-content:space-between"><span><b>Total Keuntungan</b></span><b style="color:${h.totalKeuntungan>=0?'#16a34a':'#dc2626'}">${h.totalKeuntungan>=0?'+':''}${fmt(h.totalKeuntungan)} (${h.totalKeuntunganPct}%)</b></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Kupon Harian</span><b style="color:var(--green-ink)">+${fmt(h.kuponHarian)}/hari</b></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Capital Gain/Loss</span><b style="color:${h.capitalGain>=0?'var(--green-ink)':'var(--red-ink)'}">${h.capitalGain>=0?'+':''}${fmt(h.capitalGain)} (${h.capitalGainPct}%)</b></div>
+      <div style="display:flex;justify-content:space-between"><span><b>Total Keuntungan</b></span><b style="color:${h.totalKeuntungan>=0?'var(--green-ink)':'var(--red-ink)'}">${h.totalKeuntungan>=0?'+':''}${fmt(h.totalKeuntungan)} (${h.totalKeuntunganPct}%)</b></div>
     </div>
     <div style="border-bottom:1px solid rgba(99,102,241,.15);padding-bottom:8px;margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Unit Obligasi</span><b>${h.units}</b></div>
@@ -460,10 +510,10 @@ function updateObligasiPreview(){
       <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Yield</span><b>${h.yield_}%</b></div>
       <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Tanggal Pembelian</span><b>${h.tglBeliStr}</b></div>
       <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Jatuh Tempo</span><b>${h.tglJatuhStr}</b></div>
-      <div style="display:flex;justify-content:space-between"><span>Proyeksi Return</span><b style="color:#16a34a">${fmt(h.proyeksiReturn)} (${h.proyeksiReturnPct}%)</b></div>
+      <div style="display:flex;justify-content:space-between"><span>Proyeksi Return</span><b style="color:var(--green-ink)">${fmt(h.proyeksiReturn)} (${h.proyeksiReturnPct}%)</b></div>
     </div>
-    <div style="display:flex;justify-content:space-between;font-size:12px;color:#6366f1"><span>🗓️ Kupon berikutnya</span><b>${h.kuponBerikutnya} (${h.hariKuponBerikutnya} hari lagi)</b></div>
-    <div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-top:4px"><span>Kupon terakhir otomatis</span><span>${h.tglKuponTerakhirStr}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--brand)"><span>🗓️ Kupon berikutnya</span><b>${h.kuponBerikutnya} (${h.hariKuponBerikutnya} hari lagi)</b></div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-top:4px"><span>Kupon terakhir otomatis</span><span>${h.tglKuponTerakhirStr}</span></div>
   `;
 }
 
@@ -572,13 +622,42 @@ function renderDashboard(){
   const sumOut=outs.reduce((a,t)=>a+Number(t.amount),0);
   const sumInv=invs.reduce((a,t)=>a+Number(t.amount),0);
   const bal=sumIn-sumOut;
-  const now=new Date();
-  const periodSub=activePeriod==='today'?now.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}):activePeriod==='month'?now.toLocaleDateString('id-ID',{month:'long',year:'numeric'}):activePeriod==='year'?now.getFullYear().toString():'Semua Waktu';
+  const tunai=bal-sumInv;
+
+  // Periode sebelumnya, untuk baris pembanding di tiap kartu
+  const prev=totalsOf(inRange(transactions,rangeFor(activePeriod,1)));
+
+  // Laju harian: hanya bermakna untuk periode bulan berjalan
+  let lajuHarian='';
+  if(activePeriod==='month'&&sumOut>0){
+    const kini=new Date();
+    const totalHari=new Date(kini.getFullYear(),kini.getMonth()+1,0).getDate();
+    const lewat=kini.getDate();
+    const sisa=totalHari-lewat;
+    lajuHarian=`Rata-rata ${fmt(sumOut/lewat)}/hari · sisa ${sisa} hari`;
+  }
+
   document.getElementById('dashCards').innerHTML=`
-    <div class="card card-grad grad-pink"><div class="card-label"><i class="ti ti-arrow-down-circle"></i>Total Pemasukan</div><div class="card-value">${fmt(sumIn)}</div><div class="card-sub">${periodSub} · ${ins.length} transaksi</div></div>
-    <div class="card card-grad grad-orange"><div class="card-label"><i class="ti ti-arrow-up-circle"></i>Total Pengeluaran</div><div class="card-value">${fmt(sumOut)}</div><div class="card-sub">${periodSub} · ${outs.length} transaksi</div></div>
-    <div class="card card-grad grad-blue"><div class="card-label"><i class="ti ti-building-bank"></i>Total Investasi</div><div class="card-value">${fmt(sumInv)}</div><div class="card-sub">${periodSub} · ${invs.length} aset</div></div>
-    <div class="card card-grad ${bal>=0?'grad-teal':'grad-rose'}"><div class="card-label"><i class="ti ti-wallet"></i>Saldo Bersih</div><div class="card-value">${fmt(bal)}</div><div class="card-sub">${bal>=0?'Keuangan sehat ✓':'Pengeluaran > Pemasukan'}</div></div>
+    <div class="stat stat-in">
+      <div class="stat-label"><i class="ti ti-arrow-down-circle" aria-hidden="true"></i>Pemasukan</div>
+      <div class="stat-value">${fmt(sumIn)}</div>
+      <div class="stat-sub">${deltaLine(sumIn,prev.in)||`${ins.length} transaksi`}</div>
+    </div>
+    <div class="stat stat-out">
+      <div class="stat-label"><i class="ti ti-arrow-up-circle" aria-hidden="true"></i>Pengeluaran</div>
+      <div class="stat-value">${fmt(sumOut)}</div>
+      <div class="stat-sub">${lajuHarian||deltaLine(sumOut,prev.out)||`${outs.length} transaksi`}</div>
+    </div>
+    <div class="stat stat-inv">
+      <div class="stat-label"><i class="ti ti-building-bank" aria-hidden="true"></i>Investasi</div>
+      <div class="stat-value">${fmt(sumInv)}</div>
+      <div class="stat-sub">${deltaLine(sumInv,prev.inv)||`${invs.length} aset`}</div>
+    </div>
+    <div class="stat ${bal>=0?'stat-net':'stat-warn'}">
+      <div class="stat-label"><i class="ti ti-wallet" aria-hidden="true"></i>Saldo bersih</div>
+      <div class="stat-value">${fmt(bal)}</div>
+      <div class="stat-sub">Setelah investasi: ${fmt(tunai)}</div>
+    </div>
   `;
   const recent=filtered.slice(0,5);
   const tb=document.getElementById('recentTbl');
@@ -590,18 +669,103 @@ function renderDashboard(){
     const sign=t.type==='pemasukan'?'+':t.type==='pengeluaran'?'-':'';
     return`<tr><td><div class="cat-row">${catIcon(c)}<span>${c?.name||'-'}</span></div></td><td>${t.description}</td><td style="color:var(--muted)">${t.date}</td><td><span class="badge ${badgeCls}">${t.type}</span></td><td class="${amtCls}" style="text-align:right">${sign}${fmt(t.amount)}</td></tr>`;
   }).join('');
-  buildLineChart();buildDoughnut(sumIn,sumOut,sumInv);
+  buildLineChart();buildTopKategori(filtered);
 }
+// Menampilkan pesan di dalam .chart-wrap kalau tidak ada data untuk digambar,
+// supaya tidak muncul kotak putih kosong tanpa penjelasan.
+function chartKosong(canvasId,kosong,pesan){
+  const cv=document.getElementById(canvasId);
+  if(!cv)return true;
+  const wrap=cv.parentElement;
+  let e=wrap.querySelector('.chart-empty');
+  if(kosong){
+    cv.style.display='none';
+    if(!e){
+      e=document.createElement('div');
+      e.className='chart-empty empty';
+      e.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center';
+      wrap.appendChild(e);
+    }
+    e.innerHTML=`<i class="ti ti-chart-bar" aria-hidden="true"></i>${pesan}`;
+    e.style.display='flex';
+  }else{
+    cv.style.display='';
+    if(e)e.style.display='none';
+  }
+  return kosong;
+}
+
+// Pilihan tampilan yang dipakai bersama semua grafik batang.
+// horizontal=true -> batang mendatar, sumbu nilai ada di X.
+function opsiBatang(horizontal){
+  const sumbuNilai={grid:{color:THEME.border},ticks:{color:THEME.text2,callback:v=>fmtShort(v)}};
+  const sumbuLabel={grid:{display:false},ticks:{color:THEME.text2,autoSkip:false}};
+  return{
+    indexAxis:horizontal?'y':'x',
+    responsive:true,maintainAspectRatio:false,
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{label:c=>' '+fmt(horizontal?c.parsed.x:c.parsed.y)}}
+    },
+    scales:horizontal
+      ?{x:sumbuNilai,y:sumbuLabel}
+      :{y:sumbuNilai,x:{...sumbuLabel,ticks:{...sumbuLabel.ticks,maxRotation:45}}}
+  };
+}
+
 function buildLineChart(){
   const months={};
   transactions.forEach(t=>{const m=t.date.slice(0,7);if(!months[m])months[m]={in:0,out:0,inv:0};months[m][t.type==='pemasukan'?'in':t.type==='pengeluaran'?'out':'inv']+=Number(t.amount);});
   const labels=Object.keys(months).sort().slice(-6);
   if(lineChart)lineChart.destroy();
-  lineChart=new Chart(document.getElementById('chartLine'),{type:'line',data:{labels,datasets:[{label:'Pemasukan',data:labels.map(m=>(months[m]?.in||0)/1e6),borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,.08)',tension:.4},{label:'Pengeluaran',data:labels.map(m=>(months[m]?.out||0)/1e6),borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,.08)',tension:.4},{label:'Investasi',data:labels.map(m=>(months[m]?.inv||0)/1e6),borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.08)',tension:.4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{ticks:{callback:v=>v+'jt'}}}}});
+  if(chartKosong('chartLine',!labels.length,'Belum ada transaksi untuk digambar'))return;
+  const seri=(nama,kunci,warna)=>({
+    label:nama,data:labels.map(m=>months[m]?.[kunci]||0),
+    borderColor:warna,backgroundColor:'transparent',
+    borderWidth:2,tension:.35,pointRadius:3,pointBackgroundColor:warna
+  });
+  lineChart=new Chart(document.getElementById('chartLine'),{
+    type:'line',
+    data:{labels,datasets:[
+      seri('Pemasukan','in',COLORS.green),
+      seri('Pengeluaran','out',COLORS.red),
+      seri('Investasi','inv',THEME.brand)
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{position:'bottom',labels:{color:THEME.text2,usePointStyle:true,pointStyle:'line',boxWidth:24}},
+        tooltip:{callbacks:{label:c=>' '+c.dataset.label+': '+fmt(c.parsed.y)}}
+      },
+      scales:{
+        y:{grid:{color:THEME.border},ticks:{color:THEME.text2,callback:v=>fmtShort(v)}},
+        x:{grid:{display:false},ticks:{color:THEME.text2}}
+      }
+    }
+  });
 }
-function buildDoughnut(sumIn,sumOut,sumInv){
-  if(doughnutChart)doughnutChart.destroy();
-  doughnutChart=new Chart(document.getElementById('chartDoughnut'),{type:'doughnut',data:{labels:['Pemasukan','Pengeluaran','Investasi'],datasets:[{data:[sumIn,sumOut,sumInv],backgroundColor:['#16a34a','#dc2626','#6366f1'],borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+// Menggantikan doughnut "Komposisi" yang lama. Doughnut itu hanya membandingkan
+// tiga angka yang sudah tertulis besar-besar di kartu atas, jadi tidak menambah
+// informasi apa pun. Yang benar-benar berguna: ke mana uangnya pergi.
+function buildTopKategori(filtered){
+  const peta={};
+  filtered.filter(t=>t.type==='pengeluaran').forEach(t=>{
+    const c=getCat(t.cat_id);
+    const nm=c?c.name:'Lainnya';
+    peta[nm]=(peta[nm]||0)+Number(t.amount);
+  });
+  const label=Object.keys(peta).sort((a,b)=>peta[b]-peta[a]).slice(0,5);
+  if(doughnutChart){doughnutChart.destroy();doughnutChart=null;}
+  if(chartKosong('chartDoughnut',!label.length,'Belum ada pengeluaran pada periode ini'))return;
+  doughnutChart=new Chart(document.getElementById('chartDoughnut'),{
+    type:'bar',
+    data:{labels:label,datasets:[{
+      data:label.map(k=>peta[k]),
+      backgroundColor:COLORS.red,borderRadius:5,barThickness:18
+    }]},
+    options:opsiBatang(true)
+  });
 }
 
 // ========== TRANSAKSI ==========
@@ -704,8 +868,17 @@ function renderInvest(){
   const catMap={};
   rows.forEach(r=>{const c=getCat(r.cat_id);const nm=c?c.name:'Lain';catMap[nm]=(catMap[nm]||0)+r._modal;});
   const lbls=Object.keys(catMap);
-  if(invChart)invChart.destroy();
-  invChart=new Chart(document.getElementById('chartInv'),{type:'doughnut',data:{labels:lbls,datasets:[{data:lbls.map(k=>catMap[k]),backgroundColor:['#2563eb','#7c3aed','#d97706','#16a34a','#dc2626','#0891b2'],borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+  if(invChart){invChart.destroy();invChart=null;}
+  lbls.sort((a,b)=>catMap[b]-catMap[a]);
+  if(chartKosong('chartInv',!lbls.length,'Belum ada aset untuk ditampilkan'))return;
+  invChart=new Chart(document.getElementById('chartInv'),{
+    type:'bar',
+    data:{labels:lbls,datasets:[{
+      data:lbls.map(k=>catMap[k]),
+      backgroundColor:COLORS.blue,borderRadius:5,barThickness:18
+    }]},
+    options:opsiBatang(true)
+  });
 }
 
 // ========== LAPORAN ==========
@@ -718,15 +891,33 @@ function renderLaporan(){
   const outMap={};
   filtered.filter(t=>t.type==='pengeluaran').forEach(t=>{const c=getCat(t.cat_id);const nm=c?c.name:'Lain';outMap[nm]=(outMap[nm]||0)+Number(t.amount);});
   const outLbls=Object.keys(outMap).sort((a,b)=>outMap[b]-outMap[a]);
-  if(catChart)catChart.destroy();
-  catChart=new Chart(document.getElementById('chartCat'),{type:'bar',data:{labels:outLbls,datasets:[{label:'Pengeluaran',data:outLbls.map(k=>outMap[k]/1e6),backgroundColor:'#dc2626',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{maxRotation:45}}}}});
+  if(catChart){catChart.destroy();catChart=null;}
+  if(!chartKosong('chartCat',!outLbls.length,'Belum ada pengeluaran')){
+    catChart=new Chart(document.getElementById('chartCat'),{
+      type:'bar',
+      data:{labels:outLbls.slice(0,8),datasets:[{
+        data:outLbls.slice(0,8).map(k=>outMap[k]),
+        backgroundColor:COLORS.red,borderRadius:5
+      }]},
+      options:opsiBatang(false)
+    });
+  }
 
   // Pemasukan per kategori
   const inMap={};
   filtered.filter(t=>t.type==='pemasukan').forEach(t=>{const c=getCat(t.cat_id);const nm=c?c.name:'Lain';inMap[nm]=(inMap[nm]||0)+Number(t.amount);});
   const inLbls=Object.keys(inMap).sort((a,b)=>inMap[b]-inMap[a]);
-  if(inCatChart)inCatChart.destroy();
-  inCatChart=new Chart(document.getElementById('chartInCat'),{type:'bar',data:{labels:inLbls,datasets:[{label:'Pemasukan',data:inLbls.map(k=>inMap[k]/1e6),backgroundColor:'#16a34a',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{maxRotation:45}}}}});
+  if(inCatChart){inCatChart.destroy();inCatChart=null;}
+  if(!chartKosong('chartInCat',!inLbls.length,'Belum ada pemasukan')){
+    inCatChart=new Chart(document.getElementById('chartInCat'),{
+      type:'bar',
+      data:{labels:inLbls.slice(0,8),datasets:[{
+        data:inLbls.slice(0,8).map(k=>inMap[k]),
+        backgroundColor:COLORS.green,borderRadius:5
+      }]},
+      options:opsiBatang(false)
+    });
+  }
 
   // Ringkasan bulanan
   const months={};
@@ -734,7 +925,7 @@ function renderLaporan(){
   const sorted=Object.keys(months).sort().reverse();
   const tb=document.getElementById('monthlyTbl');
   if(!sorted.length){tb.innerHTML='<tr><td colspan="5"><div class="empty"><i class="ti ti-inbox"></i>Belum ada data</div></td></tr>';}
-  else tb.innerHTML=sorted.map(m=>{const d=months[m];const bal=d.in-d.out;return`<tr><td style="font-weight:500">${m}</td><td class="amt-in" style="text-align:right">+${fmt(d.in)}</td><td class="amt-out" style="text-align:right">-${fmt(d.out)}</td><td class="amt-inv" style="text-align:right">${fmt(d.inv)}</td><td style="text-align:right;font-weight:600;color:${bal>=0?'#16a34a':'#dc2626'}">${bal>=0?'+':''}${fmt(bal)}</td></tr>`;}).join('');
+  else tb.innerHTML=sorted.map(m=>{const d=months[m];const bal=d.in-d.out;return`<tr><td style="font-weight:500">${m}</td><td class="amt-in" style="text-align:right">+${fmt(d.in)}</td><td class="amt-out" style="text-align:right">-${fmt(d.out)}</td><td class="amt-inv" style="text-align:right">${fmt(d.inv)}</td><td class="${bal>=0?'amt-in':'amt-out'}" style="text-align:right">${bal>=0?'+':''}${fmt(bal)}</td></tr>`;}).join('');
 
   // ===== REKAPAN PER KATEGORI PER BULAN =====
   // Kumpulkan semua bulan & kategori
@@ -770,7 +961,7 @@ function renderKategoriPerBulan(type, months){
   header.innerHTML=`<th>Kategori</th>${months.map(m=>`<th style="text-align:right">${m.slice(5)}</th>`).join('')}<th style="text-align:right">Total</th>`;
 
   // Baris per kategori
-  const color=type==='pengeluaran'?'#dc2626':'#16a34a';
+  const color=type==='pengeluaran'?'var(--red-ink)':'var(--green-ink)';
   tb.innerHTML=catNames.map(nm=>{
     const total=months.reduce((a,m)=>a+(catMap[nm][m]||0),0);
     if(total===0)return'';
@@ -784,7 +975,7 @@ function renderKategoriPerBulan(type, months){
   // Baris total
   const rowTotal=months.map(m=>transactions.filter(t=>t.type===type&&t.date.startsWith(m)).reduce((a,t)=>a+Number(t.amount),0));
   const grandTotal=rowTotal.reduce((a,v)=>a+v,0);
-  tb.innerHTML+=`<tr style="background:#f8fafc;font-weight:600;border-top:2px solid var(--border)">
+  tb.innerHTML+=`<tr style="background:var(--surface-2);font-weight:600;border-top:2px solid var(--border)">
     <td>TOTAL</td>
     ${rowTotal.map(v=>`<td style="text-align:right;color:${color}">${fmt(v)}</td>`).join('')}
 <td style="text-align:right;color:${color}">${fmt(grandTotal)}</td>
@@ -798,7 +989,7 @@ function renderCategories(){
     const el=document.getElementById(id);
     const cats=categories.filter(c=>c.type===type);
     el.innerHTML=cats.map(c=>`<div class="cat-card">${catIcon(c)}<div class="cat-card-info" style="flex:1"><div class="cat-name">${c.name}</div><div class="cat-type">${c.type}</div></div><button class="btn btn-ghost btn-sm" onclick="deleteCategory(${c.id})" style="color:var(--red)"><i class="ti ti-trash"></i></button></div>`).join('');
-    if(!cats.length)el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px">Belum ada kategori</div>';
+    if(!cats.length)el.innerHTML='<div class="empty" style="padding:16px">Belum ada kategori di sini</div>';
   });
 }
 function openCatModal(){document.getElementById('catModalBg').classList.add('open')}
