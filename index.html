@@ -171,6 +171,7 @@
 
       <!-- ---------- INVESTASI ---------- -->
       <div class="page" id="page-investasi">
+        <div class="cards-grid" id="investCards"></div>
         <div class="panel">
           <div class="panel-header">
             <div class="panel-title"><i class="ti ti-trending-up i-brand" aria-hidden="true"></i> Portfolio aset</div>
@@ -301,7 +302,7 @@
       </div>
       <div class="form-group">
         <label class="form-label" for="fCat">Kategori</label>
-        <select class="form-control" id="fCat" required></select>
+        <select class="form-control" id="fCat" required onchange="onCatChange()"></select>
       </div>
     </div>
     <div class="form-group">
