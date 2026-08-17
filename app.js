@@ -296,6 +296,10 @@ function openModal(id){
       document.getElementById('fAmount').value=t.amount;
       document.getElementById('fNote').value=t.note||'';
       onTypeChange();
+      // Kembalikan detail investasi dari meta agar bisa diedit ulang
+      if(t.type==='investasi'&&t.meta&&typeof t.meta==='object'){
+        restoreInvestMeta(t.meta);
+      }
     }
   }else{
     document.getElementById('fDate').value=today();
@@ -303,6 +307,7 @@ function openModal(id){
     document.getElementById('fDesc').value='';
     document.getElementById('fAmount').value='';
     document.getElementById('fNote').value='';
+    clearInvestFields();
     onTypeChange();
   }
   setLoading(false);
@@ -332,6 +337,12 @@ async function saveTransaction(){
   setLoading(true);
   try{
     const payload={date,type,cat_id:parseInt(catId),description:desc,amount:parseFloat(amount),note:note,user_id:currentUser.id};
+    // Untuk investasi, simpan detail (unit, qty, harga beli & kini) di kolom meta
+    if(type==='investasi'){
+      payload.meta=buildInvestMeta(catId);
+    }else{
+      payload.meta=null;
+    }
     if(editId){
       const{error}=await sb.from('transactions').update(payload).eq('id',editId);
       if(error)throw error;
@@ -350,6 +361,116 @@ async function saveTransaction(){
   }finally{
     setLoading(false);
   }
+}
+
+// Rangkum input form investasi menjadi objek meta yang konsisten.
+// Semua tipe menghasilkan bentuk sama: {kind, unit, qty, buyPrice, curPrice, invested, extra...}
+// qty & harga dinormalkan ke "per unit dasar" supaya perhitungan gain/loss seragam.
+function buildInvestMeta(catId){
+  const kind=getCatType(catId);
+  const num=id=>parseFloat(document.getElementById(id)?.value)||0;
+  const str=id=>(document.getElementById(id)?.value||'').trim();
+
+  if(kind==='saham'){
+    const lot=num('fLot'),avg=num('fAvgPrice'),cur=num('fCurPriceSaham');
+    // 1 lot = 100 lembar
+    const qty=lot*100;
+    return{kind,unit:'lot',lot,qty,buyPrice:avg,curPrice:cur||avg,kode:str('fKodeSaham').toUpperCase(),invested:avg*qty};
+  }
+  if(kind==='crypto'){
+    const qty=num('fCoinQty'),buy=num('fCoinBuyPrice');
+    const cur=(selectedCoin&&livePrices[selectedCoin.id])||buy;
+    return{kind,unit:'koin',qty,buyPrice:buy,curPrice:cur,coinId:selectedCoin?.id||'',symbol:(selectedCoin?.symbol||'').toUpperCase(),invested:buy*qty};
+  }
+  if(kind==='emas'){
+    const qty=num('fGoldGram'),buy=num('fGoldBuyPrice');
+    const cur=livePrices['gold']||buy;
+    return{kind,unit:'gram',qty,buyPrice:buy,curPrice:cur,invested:buy*qty};
+  }
+  if(kind==='obligasi'){
+    const kupon=num('fKuponRate'),hargaPct=num('fHargaBeliPct'),unit=num('fJumlahUnit');
+    const nominal=1e6;
+    const buyPerUnit=nominal*hargaPct/100;
+    // Nilai kini obligasi diasumsikan kembali ke nominal (100%) bila dipegang hingga tempo
+    return{kind,unit:'unit',qty:unit,buyPrice:buyPerUnit,curPrice:nominal,kupon,tglBeli:str('fTglBeli'),tglJatuhTempo:str('fTglJatuhTempo'),invested:buyPerUnit*unit};
+  }
+  // generik
+  const qty=num('fUnits'),buy=num('fBuyPrice'),cur=num('fCurPrice');
+  return{kind:'other',unit:'unit',qty,buyPrice:buy,curPrice:cur||buy,invested:buy*qty};
+}
+
+// Hitung gain/loss dari meta. Mengembalikan {modal, kini, gain, pct}.
+// Fallback aman: bila meta tidak ada, modal=kini=amount, gain=0.
+function calcInvest(t){
+  const m=t.meta;
+  const modalAmount=Number(t.amount)||0;
+  if(!m||typeof m!=='object'){
+    return{modal:modalAmount,kini:modalAmount,gain:0,pct:0};
+  }
+  const qty=Number(m.qty)||0;
+  const buy=Number(m.buyPrice)||0;
+  const cur=Number(m.curPrice)||buy;
+  const modal=m.invested!=null?Number(m.invested):(buy*qty);
+  // Bila qty tidak valid, anggap nilai kini = modal (gain 0) agar tidak muncul nilai 0 palsu
+  const kini=qty>0?cur*qty:modal;
+  const gain=kini-modal;
+  const pct=modal?(gain/modal*100):0;
+  return{modal,kini,gain,pct};
+}
+
+// Isi ulang field form investasi dari meta (dipakai saat mengedit transaksi).
+function restoreInvestMeta(m){
+  const set=(id,val)=>{const el=document.getElementById(id);if(el&&val!=null)el.value=val;};
+  const kind=m.kind||'other';
+  if(kind==='saham'){
+    set('fKodeSaham',m.kode||'');
+    set('fLot',m.lot||(m.qty?m.qty/100:''));
+    set('fAvgPrice',m.buyPrice||'');
+    set('fCurPriceSaham',m.curPrice||'');
+    updateSahamPreview();
+  }else if(kind==='crypto'){
+    set('fCoinQty',m.qty||'');
+    set('fCoinBuyPrice',m.buyPrice||'');
+    if(m.coinId){
+      selectedCoin={id:m.coinId,name:m.symbol||m.coinId,symbol:m.symbol||'',image:''};
+      livePrices[m.coinId]=m.curPrice||m.buyPrice||0;
+      const sel=document.getElementById('fCoinSelected');
+      if(sel){sel.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--border);border-radius:4px"><b>${escapeHtml(m.symbol||'')}</b></div>`;}
+    }
+    updateCryptoPreview();
+  }else if(kind==='emas'){
+    set('fGoldGram',m.qty||'');
+    set('fGoldBuyPrice',m.buyPrice||'');
+    if(m.curPrice)livePrices['gold']=m.curPrice;
+    updateEmasPreview();
+  }else if(kind==='obligasi'){
+    set('fKuponRate',m.kupon||'');
+    // hitung ulang harga beli % dari buyPrice per unit
+    const nominal=1e6;
+    if(m.buyPrice)set('fHargaBeliPct',((m.buyPrice/nominal)*100).toFixed(2));
+    set('fJumlahUnit',m.qty||'');
+    set('fTglBeli',m.tglBeli||'');
+    set('fTglJatuhTempo',m.tglJatuhTempo||'');
+    updateObligasiPreview();
+  }else{
+    set('fBuyPrice',m.buyPrice||'');
+    set('fCurPrice',m.curPrice||'');
+    set('fUnits',m.qty||'');
+    updateGainPreview();
+  }
+}
+
+// Kosongkan semua field & preview investasi (dipakai saat modal transaksi baru).
+function clearInvestFields(){
+  ['fKodeSaham','fLot','fAvgPrice','fCurPriceSaham',
+   'fCoinQty','fCoinBuyPrice','fCoinSearch',
+   'fGoldGram','fGoldBuyPrice',
+   'fKuponRate','fHargaBeliPct','fJumlahUnit','fTglBeli','fTglJatuhTempo','fTglKuponTerakhir',
+   'fBuyPrice','fCurPrice','fUnits'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['sahamPreview','cryptoPreview','emasPreview','obligasiPreview','gainPreview'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.display='none';el.innerHTML='';}});
+  const sel=document.getElementById('fCoinSelected');if(sel)sel.innerHTML='';
+  const dd=document.getElementById('coinDropdown');if(dd)dd.innerHTML='';
+  selectedCoin=null;
 }
 async function deleteTransaction(id){
   if(!confirm('Hapus transaksi ini?'))return;
@@ -390,6 +511,21 @@ function onTypeChange(){
     const o=document.createElement('option');o.value=c.id;o.textContent=c.name;sel.appendChild(o);
   });
   if(t==='investasi')onCatChange();
+}
+
+// Tampilkan blok detail investasi sesuai kategori yang dipilih.
+// Saham → sahamExtra, Kripto → cryptoExtra, Emas → emasExtra,
+// Obligasi → obligasiExtra, sisanya → investExtra (generik).
+function onCatChange(){
+  const t=document.getElementById('fType').value;
+  const blocks=['sahamExtra','cryptoExtra','emasExtra','obligasiExtra','investExtra'];
+  blocks.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  if(t!=='investasi')return;
+  const catId=document.getElementById('fCat').value;
+  const kind=getCatType(catId);
+  const map={saham:'sahamExtra',crypto:'cryptoExtra',emas:'emasExtra',obligasi:'obligasiExtra',other:'investExtra'};
+  const target=document.getElementById(map[kind]||'investExtra');
+  if(target)target.style.display='block';
 }
 
 // ========== PREVIEWS ==========
@@ -649,29 +785,69 @@ function renderCharts(data){
 // ========== INVESTASI ==========
 function renderInvestasi(){
   const rows=transactions.filter(t=>t.type==='investasi').map(r=>{
-    const c=getCat(r.cat_id);
-    const type=getCatType(r.cat_id);
-    let gain=0,pct=0;
-    r._gain=gain;r._pct=pct;r._modal=r.amount;r._kini=r.amount;
+    const calc=calcInvest(r);
+    r._modal=calc.modal;r._kini=calc.kini;r._gain=calc.gain;r._pct=calc.pct;
     return r;
   });
+
+  // ----- Summary cards: total modal, nilai kini, total P&L -----
+  const totModal=rows.reduce((a,r)=>a+r._modal,0);
+  const totKini=rows.reduce((a,r)=>a+r._kini,0);
+  const totGain=totKini-totModal;
+  const totPct=totModal?(totGain/totModal*100):0;
+  const cardsEl=document.getElementById('investCards');
+  if(cardsEl){
+    const gainColor=totGain>=0?'green':'red';
+    cardsEl.innerHTML=`
+      <div class="card-stat" style="--aksen:var(--blue)">
+        <div class="card-content">
+          <div class="card-label"><i class="ti ti-wallet"></i> Total Modal</div>
+          <div class="card-value" style="color:var(--blue)">${fmt(totModal)}</div>
+        </div>
+      </div>
+      <div class="card-stat" style="--aksen:var(--purple)">
+        <div class="card-content">
+          <div class="card-label"><i class="ti ti-coins"></i> Nilai Kini</div>
+          <div class="card-value" style="color:var(--purple)">${fmt(totKini)}</div>
+        </div>
+      </div>
+      <div class="card-stat" style="--aksen:var(--${gainColor})">
+        <div class="card-content">
+          <div class="card-label"><i class="ti ti-trending-${totGain>=0?'up':'down'}"></i> Total P&L</div>
+          <div class="card-value" style="color:var(--${gainColor})">${totGain>=0?'+':''}${fmt(totGain)}</div>
+          <div class="card-sub" style="color:var(--${gainColor})">${totGain>=0?'+':''}${totPct.toFixed(2)}%</div>
+        </div>
+      </div>`;
+  }
+
+  // ----- Tabel per aset -----
   const html=rows.map(r=>{
     const c=getCat(r.cat_id);
+    const m=r.meta&&typeof r.meta==='object'?r.meta:null;
+    let detail='';
+    if(m){
+      if(m.kind==='saham')detail=`${m.kode||''} · ${m.lot||(m.qty/100)} lot`;
+      else if(m.kind==='crypto')detail=`${m.qty} ${m.symbol||'koin'}`;
+      else if(m.kind==='emas')detail=`${m.qty} gram`;
+      else if(m.kind==='obligasi')detail=`${m.qty} unit · kupon ${m.kupon||0}%`;
+      else detail=`${m.qty||0} unit`;
+    }
     return`<tr>
       <td>${catIcon(c)}</td>
-      <td>${escapeHtml(r.description)}</td>
+      <td>${escapeHtml(r.description)}${detail?`<br><small style="color:var(--text-3)">${escapeHtml(detail)}</small>`:''}</td>
       <td><small>${r.date}</small></td>
       <td><span class="badge badge-blue">${escapeHtml(c?.name||'-')}</span></td>
-      <td>${fmt(r._modal)}</td>
-      <td>${fmt(r._kini)}</td>
-      <td style="text-align:right"><span class="${r._gain>=0?'gain-pos':'gain-neg'}">${r._gain>=0?'+':''}${fmt(r._gain)}<br><small>${r._pct}%</small></span></td>
+      <td class="ta-r">${fmt(r._modal)}</td>
+      <td class="ta-r">${fmt(r._kini)}</td>
+      <td class="ta-r"><span class="${r._gain>=0?'gain-pos':'gain-neg'}">${r._gain>=0?'+':''}${fmt(r._gain)}<br><small>${r._gain>=0?'+':''}${r._pct.toFixed(2)}%</small></span></td>
       <td><button class="btn btn-ghost btn-sm" onclick="openModal(${r.id})"><i class="ti ti-edit"></i></button></td>
     </tr>`;
   }).join('');
   document.getElementById('investTbl').innerHTML=html||'<tr><td colspan="8"><div class="empty"><i class="ti ti-inbox"></i>Belum ada aset</div></td></tr>';
-  
+
+  // ----- Chart komposisi (pakai nilai kini, bukan modal) -----
   const catMap={};
-  rows.forEach(r=>{const c=getCat(r.cat_id);const nm=c?c.name:'Lain';catMap[nm]=(catMap[nm]||0)+r._modal;});
+  rows.forEach(r=>{const c=getCat(r.cat_id);const nm=c?c.name:'Lain';catMap[nm]=(catMap[nm]||0)+r._kini;});
   const lbls=Object.keys(catMap).sort((a,b)=>catMap[b]-catMap[a]);
   if(invChart){invChart.destroy();invChart=null;}
   if(chartKosong('chartInv',!lbls.length,'Belum ada aset untuk ditampilkan'))return;
