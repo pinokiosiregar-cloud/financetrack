@@ -381,3 +381,18 @@ body{
 .btn-ghost-danger:hover{background:rgba(220,38,38,.08);color:var(--red)}
 .btn-sm{padding:6px 12px;font-size:var(--fs-xs)}
 .btn-block{width:100%}
+.btn:disabled:hover{transform:none}
+
+/* =====================================================================
+   PAGINASI (panel Rincian Pendapatan/Pengeluaran)
+   ===================================================================== */
+.pagination{display:flex;align-items:center;justify-content:space-between;
+  gap:var(--sp-3);margin-top:var(--sp-3);flex-wrap:wrap}
+.pagination-info{font-size:var(--fs-xs);color:var(--text-3)}
+.pagination-controls{display:flex;align-items:center;gap:8px}
+.pagination-page{font-size:var(--fs-xs);color:var(--text-2);font-weight:500;
+  min-width:56px;text-align:center}
+
+/* Kategori + ikon sejajar di dalam sel tabel (kolom Kategori) */
+.cat-row .cat-icon{width:28px;height:28px;font-size:14px}
+.cat-row span{font-size:var(--fs-base);color:var(--text)}
