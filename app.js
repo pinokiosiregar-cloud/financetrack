@@ -33,6 +33,9 @@ let rincianInSearch='',rincianInPage=1;
 let rincianOutSearch='',rincianOutPage=1;
 const RINCIAN_PAGE_SIZE=8;
 
+// State Pinjaman
+let pinjamanList=[],editPinjamanId=null;
+
 // ========== UTILS: HTML ESCAPING & SAFE RENDERING ==========
 // Escape HTML untuk mencegah XSS
 const escapeHtml=s=>{const m={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};return(s||'').replace(/[&<>"']/g,c=>m[c])};
@@ -46,8 +49,10 @@ function setLoading(show){
   isLoading=show;
   const btn=document.querySelector('.modal-actions .btn-primary');
   const catBtn=document.getElementById('saveCatBtn');
+  const pinjamanBtn=document.getElementById('savePinjamanBtn');
   if(btn){btn.disabled=show;btn.innerHTML=show?'<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Menyimpan...':'<i class="ti ti-check"></i>Simpan';}
   if(catBtn){catBtn.disabled=show;catBtn.innerHTML=show?'<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Menyimpan...':'<i class="ti ti-check"></i>Simpan';}
+  if(pinjamanBtn){pinjamanBtn.disabled=show;pinjamanBtn.innerHTML=show?'<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Menyimpan...':'<i class="ti ti-check"></i>Simpan';}
 }
 
 function showMsg(el,msg,success=false){
@@ -117,7 +122,7 @@ async function handleLogout(){
     await sb.auth.signOut();
     document.getElementById('appPage').style.display='none';
     document.getElementById('loginPage').style.display='flex';
-    currentUser=null;categories=[];transactions=[];
+    currentUser=null;categories=[];transactions=[];pinjamanList=[];
   }catch(e){
     console.error('Logout error:',e);
   }
@@ -136,6 +141,7 @@ async function showApp(){
   document.getElementById('fDate').value=today();
   await loadCategories();
   await loadTransactions();
+  await loadPinjaman();
   loadTheme();
   setPeriod(activePeriod);
   ['fBuyPrice','fCurPrice','fUnits'].forEach(id=>{
@@ -152,6 +158,7 @@ function setupKeyboardShortcuts(){
     if(e.key==='Escape'){
       if(document.getElementById('modalBg').classList.contains('open')){closeModal();}
       if(document.getElementById('catModalBg').classList.contains('open')){closeCatModal();}
+      if(document.getElementById('pinjamanModalBg').classList.contains('open')){closePinjamanModal();}
       if(document.getElementById('analysisModalBg').classList.contains('open')){document.getElementById('analysisModalBg').classList.remove('open');}
     }
   });
@@ -176,9 +183,28 @@ function setupKeyboardShortcuts(){
       }
     });
   }
+
+  const pinjamanModal=document.getElementById('pinjamanModalBg');
+  if(pinjamanModal){
+    pinjamanModal.addEventListener('keydown',e=>{
+      if(e.key==='Enter'&&!isLoading){
+        const saveBtn=document.getElementById('savePinjamanBtn');
+        if(saveBtn)saveBtn.click();
+      }
+    });
+  }
 }
 
 // ========== LOAD DATA ==========
+async function loadPinjaman(){
+  try{
+    const{data,error}=await sb.from('pinjaman').select('*').eq('user_id',currentUser.id).order('created_at',{ascending:false});
+    if(error)throw error;
+    pinjamanList=data||[];
+  }catch(e){
+    console.error('Load pinjaman error:',e);
+  }
+}
 async function loadCategories(){
   try{
     const{data,error}=await sb.from('categories').select('*').eq('user_id',currentUser.id).order('name');
@@ -498,11 +524,12 @@ function showPage(page,el){
   document.getElementById('page-'+page).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
-  const titles={'dashboard':'Dashboard','transaksi':'Data transaksi','investasi':'Investasi','laporan':'Laporan','kategori':'Data kategori'};
+  const titles={'dashboard':'Dashboard','transaksi':'Data transaksi','investasi':'Investasi','pinjaman':'Pinjaman','laporan':'Laporan','kategori':'Data kategori'};
   safeTxt(document.getElementById('pageTitle'),titles[page]||'Dashboard');
   if(page==='dashboard')renderDashboard();
   else if(page==='transaksi')renderTables();
   else if(page==='investasi')renderInvestasi();
+  else if(page==='pinjaman')renderPinjaman();
   else if(page==='laporan')renderLaporan();
   else if(page==='kategori')renderCategories();
 }
@@ -939,6 +966,189 @@ function renderInvestasi(){
     data:{labels:lbls,datasets:[{data:lbls.map(k=>catMap[k]),backgroundColor:COLORS.blue,borderRadius:5,barThickness:18}]},
     options:opsiBatang(true)
   });
+}
+
+// ========== PINJAMAN ==========
+// Metode bunga: anuitas/efektif. Skedul dihitung sekali penuh (bulan 1..n),
+// lalu diambil baris sesuai jumlah bulan berjalan untuk dapat sisa pokok
+// saat ini — tidak menghitung bunga berjalan harian.
+function buildJadwalAnuitas(pokok,bungaPersenTahun,n){
+  const r=(Number(bungaPersenTahun)||0)/100/12;
+  const angsuran=r===0?pokok/n:pokok*r/(1-Math.pow(1+r,-n));
+  const jadwal=[];
+  let sisa=pokok;
+  for(let bulan=1;bulan<=n;bulan++){
+    const bunga=sisa*r;
+    let pokokBayar=angsuran-bunga;
+    sisa=sisa-pokokBayar;
+    if(bulan===n||sisa<0)sisa=0; // rapikan pembulatan di akhir tenor
+    jadwal.push({bulan,angsuran,bunga,pokokBayar,sisa});
+  }
+  return jadwal;
+}
+// Bulan berjalan dihitung dari tanggal_mulai (dianggap sebagai tanggal
+// jatuh tempo angsuran tiap bulan) sampai hari ini, di-clamp ke [0, n].
+function bulanBerjalan(tanggalMulai,n){
+  const start=new Date(tanggalMulai+'T00:00:00');
+  const now=new Date();
+  let bulan=(now.getFullYear()-start.getFullYear())*12+(now.getMonth()-start.getMonth());
+  if(now.getDate()<start.getDate())bulan-=1;
+  return Math.max(0,Math.min(bulan,n));
+}
+function pinjamanStats(p){
+  const n=p.jangka_waktu_bulan;
+  const jadwal=buildJadwalAnuitas(Number(p.pokok),Number(p.bunga_persen_tahun),n);
+  const elapsed=bulanBerjalan(p.tanggal_mulai,n);
+  const angsuranPerBulan=jadwal[0]?jadwal[0].angsuran:0;
+  const sisaPokok=elapsed===0?Number(p.pokok):(jadwal[elapsed-1]?jadwal[elapsed-1].sisa:0);
+  const sisaBulan=n-elapsed;
+  const progress=n?Math.min(100,(elapsed/n)*100):0;
+  return{angsuranPerBulan,sisaPokok,sisaBulan,elapsed,progress};
+}
+function renderPinjaman(){
+  const listEl=document.getElementById('pinjamanList');
+  const summaryEl=document.getElementById('pinjamanSummaryCards');
+  if(!listEl||!summaryEl)return;
+
+  let totPokok=0,totSisa=0,totAngsuran=0;
+  const cardsHtml=pinjamanList.map(p=>{
+    const s=pinjamanStats(p);
+    totPokok+=Number(p.pokok);
+    totSisa+=s.sisaPokok;
+    totAngsuran+=s.angsuranPerBulan;
+    const lunas=s.sisaBulan<=0;
+    return`<div class="loan-card${lunas?' loan-lunas':''}">
+      <div class="loan-card-header">
+        <div class="loan-name"><i class="ti ti-building-bank"></i> ${escapeHtml(p.nama)}</div>
+        <div class="loan-actions">
+          <button class="btn btn-ghost btn-sm" onclick="openPinjamanModal('${p.id}')"><i class="ti ti-edit"></i></button>
+          <button class="btn btn-ghost btn-sm" onclick="deletePinjaman('${p.id}')"><i class="ti ti-trash"></i></button>
+        </div>
+      </div>
+      <div class="loan-stats">
+        <div class="loan-stat"><span class="loan-stat-label">Angsuran/bulan</span><span class="loan-stat-value">${fmt(s.angsuranPerBulan)}</span></div>
+        <div class="loan-stat"><span class="loan-stat-label">Sisa pokok</span><span class="loan-stat-value">${fmt(s.sisaPokok)}</span></div>
+        <div class="loan-stat"><span class="loan-stat-label">Sisa tenor</span><span class="loan-stat-value">${lunas?'Lunas':s.sisaBulan+' bulan'}</span></div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${s.progress.toFixed(1)}%"></div></div>
+      <div class="loan-progress-label">${s.progress.toFixed(0)}% terbayar &middot; bulan ke-${s.elapsed} dari ${p.jangka_waktu_bulan}</div>
+    </div>`;
+  }).join('');
+  listEl.innerHTML=cardsHtml||'<div class="empty"><i class="ti ti-inbox"></i>Belum ada pinjaman</div>';
+
+  summaryEl.innerHTML=`
+    <div class="card-stat" style="--aksen:var(--blue)">
+      <div class="card-content">
+        <div class="card-label"><i class="ti ti-wallet"></i> Total Pokok</div>
+        <div class="card-value" style="color:var(--blue)">${fmt(totPokok)}</div>
+      </div>
+    </div>
+    <div class="card-stat" style="--aksen:var(--red)">
+      <div class="card-content">
+        <div class="card-label"><i class="ti ti-credit-card"></i> Total Sisa Pokok</div>
+        <div class="card-value" style="color:var(--red)">${fmt(totSisa)}</div>
+      </div>
+    </div>
+    <div class="card-stat" style="--aksen:var(--amber)">
+      <div class="card-content">
+        <div class="card-label"><i class="ti ti-calendar-due"></i> Total Angsuran/bulan</div>
+        <div class="card-value" style="color:var(--amber)">${fmt(totAngsuran)}</div>
+      </div>
+    </div>`;
+}
+function updatePinjamanPreview(){
+  const preview=document.getElementById('pinjamanPreview');
+  if(!preview)return;
+  const pokok=parseFloat(document.getElementById('pPokok').value)||0;
+  const bunga=parseFloat(document.getElementById('pBunga').value)||0;
+  const tenor=parseInt(document.getElementById('pTenor').value)||0;
+  if(!pokok||!tenor){preview.style.display='none';return;}
+  const jadwal=buildJadwalAnuitas(pokok,bunga,tenor);
+  const angsuran=jadwal[0]?jadwal[0].angsuran:0;
+  const totalBayar=angsuran*tenor;
+  const totalBunga=totalBayar-pokok;
+  preview.style.display='block';
+  preview.innerHTML=`
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Angsuran per bulan</span><b>${fmt(angsuran)}</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Total dibayar (${tenor} bulan)</span><b>${fmt(totalBayar)}</b></div>
+    <div style="display:flex;justify-content:space-between"><span>Total bunga</span><b>${fmt(totalBunga)}</b></div>`;
+}
+function openPinjamanModal(id){
+  editPinjamanId=id||null;
+  const modal=document.getElementById('pinjamanModalBg');
+  const msg=document.getElementById('pinjamanMsg');
+  const title=modal.querySelector('.modal-title');
+  if(msg)msg.style.display='none';
+  if(title)title.innerHTML=`<i class="ti ti-building-bank i-brand" aria-hidden="true"></i>${id?'Edit pinjaman':'Tambah pinjaman'}`;
+  if(id){
+    const p=pinjamanList.find(x=>x.id===id);
+    if(p){
+      document.getElementById('pNama').value=p.nama;
+      document.getElementById('pPokok').value=p.pokok;
+      document.getElementById('pBunga').value=p.bunga_persen_tahun;
+      document.getElementById('pTenor').value=p.jangka_waktu_bulan;
+      document.getElementById('pTglMulai').value=p.tanggal_mulai;
+    }
+  }else{
+    document.getElementById('pNama').value='';
+    document.getElementById('pPokok').value='';
+    document.getElementById('pBunga').value='';
+    document.getElementById('pTenor').value='';
+    document.getElementById('pTglMulai').value=today();
+  }
+  updatePinjamanPreview();
+  setLoading(false);
+  modal.classList.add('open');
+}
+function closePinjamanModal(){
+  document.getElementById('pinjamanModalBg').classList.remove('open');
+  editPinjamanId=null;
+}
+async function savePinjaman(){
+  if(isLoading)return;
+  const nama=document.getElementById('pNama').value.trim();
+  const pokok=parseFloat(document.getElementById('pPokok').value);
+  const bunga=parseFloat(document.getElementById('pBunga').value)||0;
+  const tenor=parseInt(document.getElementById('pTenor').value);
+  const tglMulai=document.getElementById('pTglMulai').value;
+  const msg=document.getElementById('pinjamanMsg');
+
+  if(!nama||!pokok||pokok<=0||!tenor||tenor<=0||!tglMulai){
+    showMsg(msg,'Harap lengkapi semua bidang wajib dengan nilai yang valid');
+    return;
+  }
+
+  setLoading(true);
+  try{
+    const payload={nama,pokok,bunga_persen_tahun:bunga,jangka_waktu_bulan:tenor,tanggal_mulai:tglMulai,metode_bunga:'anuitas',user_id:currentUser.id};
+    if(editPinjamanId){
+      const{error}=await sb.from('pinjaman').update(payload).eq('id',editPinjamanId);
+      if(error)throw error;
+    }else{
+      const{error}=await sb.from('pinjaman').insert([payload]);
+      if(error)throw error;
+    }
+    await loadPinjaman();
+    closePinjamanModal();
+    renderPinjaman();
+  }catch(e){
+    console.error('Save pinjaman error:',e);
+    showMsg(msg,'Gagal simpan: '+e.message);
+  }finally{
+    setLoading(false);
+  }
+}
+async function deletePinjaman(id){
+  if(!confirm('Hapus data pinjaman ini?'))return;
+  try{
+    const{error}=await sb.from('pinjaman').delete().eq('id',id);
+    if(error)throw error;
+    await loadPinjaman();
+    renderPinjaman();
+  }catch(e){
+    console.error('Delete pinjaman error:',e);
+    alert('Gagal hapus: '+e.message);
+  }
 }
 
 // ========== LAPORAN ==========
