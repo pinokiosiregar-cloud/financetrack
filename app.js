@@ -27,6 +27,12 @@ let lineChart=null,doughnutChart=null,catChart=null,inCatChart=null,invChart=nul
 let selectedCoin=null,livePrices={};
 let isLoading=false;
 
+// State panel Rincian Pendapatan/Pengeluaran (dashboard)
+let dashPeriodFiltered=[];
+let rincianInSearch='',rincianInPage=1;
+let rincianOutSearch='',rincianOutPage=1;
+const RINCIAN_PAGE_SIZE=8;
+
 // ========== UTILS: HTML ESCAPING & SAFE RENDERING ==========
 // Escape HTML untuk mencegah XSS
 const escapeHtml=s=>{const m={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};return(s||'').replace(/[&<>"']/g,c=>m[c])};
@@ -682,6 +688,8 @@ function renderDashboard(){
   `).join('');
   renderCharts(filtered);
   renderRecent(filtered);
+  dashPeriodFiltered=filtered;
+  renderRincian();
 }
 function renderRecent(data){
   const recent=data.slice(0,10).sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -698,6 +706,81 @@ function renderRecent(data){
   }).join('');
   if(!recent.length)tb.innerHTML='<tr><td colspan="5"><div class="empty"><i class="ti ti-inbox"></i>Belum ada transaksi</div></td></tr>';
 }
+// ========== RINCIAN PENDAPATAN & PENGELUARAN (DASHBOARD) ==========
+// Sumber data: dashPeriodFiltered, yaitu transaksi yang sudah disaring
+// oleh filter periode dashboard (Hari ini/Bulan/Tahun/Semua) — jadi
+// panel ini otomatis ikut filter periode tanpa filter tahun terpisah.
+function rincianFilteredRows(type,search){
+  let rows=dashPeriodFiltered.filter(t=>t.type===type);
+  if(search){
+    const q=search.toLowerCase();
+    rows=rows.filter(t=>{
+      const c=getCat(t.cat_id);
+      return(t.description||'').toLowerCase().includes(q)
+        ||(t.note||'').toLowerCase().includes(q)
+        ||(c?.name||'').toLowerCase().includes(q);
+    });
+  }
+  return rows.slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+}
+function renderRincianPanel(type){
+  const isIn=type==='pemasukan';
+  const search=isIn?rincianInSearch:rincianOutSearch;
+  let page=isIn?rincianInPage:rincianOutPage;
+  const tbId=isIn?'rincianInTbl':'rincianOutTbl';
+  const pagerId=isIn?'rincianInPager':'rincianOutPager';
+
+  const rows=rincianFilteredRows(type,search);
+  const totalPages=Math.max(1,Math.ceil(rows.length/RINCIAN_PAGE_SIZE));
+  if(page>totalPages)page=totalPages;
+  if(page<1)page=1;
+  if(isIn)rincianInPage=page;else rincianOutPage=page;
+
+  const startIdx=(page-1)*RINCIAN_PAGE_SIZE;
+  const pageRows=rows.slice(startIdx,startIdx+RINCIAN_PAGE_SIZE);
+
+  const tb=document.getElementById(tbId);
+  tb.innerHTML=pageRows.map((t,i)=>{
+    const c=getCat(t.cat_id);
+    return`<tr>
+      <td>${startIdx+i+1}</td>
+      <td><div class="cat-row">${catIcon(c)}<span>${escapeHtml(c?.name||'-')}</span></div></td>
+      <td class="ta-r">${isIn?'':'-'}${fmt(t.amount)}</td>
+      <td><small>${t.date}</small></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="openModal(${t.id})"><i class="ti ti-edit"></i></button><button class="btn btn-ghost btn-sm" onclick="deleteTransaction(${t.id})"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  }).join('');
+  if(!pageRows.length){
+    const emptyMsg=rows.length?'Tidak ada hasil pencarian':(isIn?'Belum ada pendapatan':'Belum ada pengeluaran');
+    tb.innerHTML=`<tr><td colspan="5"><div class="empty"><i class="ti ti-inbox"></i>${emptyMsg}</div></td></tr>`;
+  }
+
+  const pager=document.getElementById(pagerId);
+  const rangeStart=rows.length?startIdx+1:0;
+  const rangeEnd=Math.min(startIdx+RINCIAN_PAGE_SIZE,rows.length);
+  pager.innerHTML=`
+    <span class="pagination-info">${rangeStart}\u2013${rangeEnd} dari ${rows.length}</span>
+    <div class="pagination-controls">
+      <button class="btn btn-ghost btn-sm" onclick="changeRincianPage('${type}',-1)" ${page<=1?'disabled':''}><i class="ti ti-chevron-left"></i></button>
+      <span class="pagination-page">Hal ${page}/${totalPages}</span>
+      <button class="btn btn-ghost btn-sm" onclick="changeRincianPage('${type}',1)" ${page>=totalPages?'disabled':''}><i class="ti ti-chevron-right"></i></button>
+    </div>`;
+}
+function renderRincian(){
+  renderRincianPanel('pemasukan');
+  renderRincianPanel('pengeluaran');
+}
+function onRincianSearch(type){
+  const isIn=type==='pemasukan';
+  const val=document.getElementById(isIn?'rincianInSearch':'rincianOutSearch').value;
+  if(isIn){rincianInSearch=val;rincianInPage=1;}else{rincianOutSearch=val;rincianOutPage=1;}
+  renderRincianPanel(type);
+}
+function changeRincianPage(type,delta){
+  if(type==='pemasukan')rincianInPage+=delta;else rincianOutPage+=delta;
+  renderRincianPanel(type);
+}
+
 function renderTables(){
   const filterType=document.getElementById('filterType').value;
   const filterMonth=document.getElementById('filterMonth').value;
@@ -990,6 +1073,7 @@ function setPeriod(p){
   activePeriod=p;
   document.querySelectorAll('.period-tab').forEach(el=>el.classList.remove('active'));
   document.getElementById('ptab-'+p).classList.add('active');
+  rincianInPage=1;rincianOutPage=1;
   renderDashboard();
 }
 
