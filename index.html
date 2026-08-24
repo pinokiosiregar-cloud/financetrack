@@ -141,6 +141,40 @@
             </table>
           </div>
         </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title"><i class="ti ti-arrow-up-right i-green" aria-hidden="true"></i> Rincian Pendapatan</div>
+            </div>
+            <div class="filter-bar">
+              <input type="text" class="form-control" id="rincianInSearch" placeholder="Cari kategori atau catatan" oninput="onRincianSearch('pemasukan')" aria-label="Cari rincian pendapatan">
+            </div>
+            <div class="scroll-x">
+              <table class="tbl">
+                <thead><tr><th>No</th><th>Kategori</th><th class="ta-r">Jumlah</th><th>Tanggal</th><th></th></tr></thead>
+                <tbody id="rincianInTbl"></tbody>
+              </table>
+            </div>
+            <div class="pagination" id="rincianInPager"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title"><i class="ti ti-arrow-down-left i-red" aria-hidden="true"></i> Rincian Pengeluaran</div>
+            </div>
+            <div class="filter-bar">
+              <input type="text" class="form-control" id="rincianOutSearch" placeholder="Cari kategori atau catatan" oninput="onRincianSearch('pengeluaran')" aria-label="Cari rincian pengeluaran">
+            </div>
+            <div class="scroll-x">
+              <table class="tbl">
+                <thead><tr><th>No</th><th>Kategori</th><th class="ta-r">Jumlah</th><th>Tanggal</th><th></th></tr></thead>
+                <tbody id="rincianOutTbl"></tbody>
+              </table>
+            </div>
+            <div class="pagination" id="rincianOutPager"></div>
+          </div>
+        </div>
       </div>
 
       <!-- ---------- TRANSAKSI ---------- -->
