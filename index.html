@@ -82,6 +82,7 @@
       <div class="nav-section">Data</div>
       <div class="nav-item" onclick="showPage('transaksi',this)" title="Data transaksi" role="button" tabindex="0"><i class="ti ti-list" aria-hidden="true"></i>Data transaksi</div>
       <div class="nav-item" onclick="showPage('investasi',this)" title="Investasi" role="button" tabindex="0"><i class="ti ti-trending-up" aria-hidden="true"></i>Investasi</div>
+      <div class="nav-item" onclick="showPage('pinjaman',this)" title="Pinjaman" role="button" tabindex="0"><i class="ti ti-building-bank" aria-hidden="true"></i>Pinjaman</div>
       <div class="nav-item" onclick="showPage('laporan',this)" title="Laporan" role="button" tabindex="0"><i class="ti ti-chart-bar" aria-hidden="true"></i>Laporan</div>
       <div class="nav-section">Pengaturan</div>
       <div class="nav-item" onclick="showPage('kategori',this)" title="Data kategori" role="button" tabindex="0"><i class="ti ti-tag" aria-hidden="true"></i>Data kategori</div>
@@ -223,6 +224,18 @@
             <div class="panel-title"><i class="ti ti-chart-pie i-blue" aria-hidden="true"></i> Komposisi aset</div>
           </div>
           <div class="chart-wrap"><canvas id="chartInv"></canvas></div>
+        </div>
+      </div>
+
+      <!-- ---------- PINJAMAN ---------- -->
+      <div class="page" id="page-pinjaman">
+        <div class="cards-grid" id="pinjamanSummaryCards"></div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><i class="ti ti-building-bank i-brand" aria-hidden="true"></i> Daftar pinjaman</div>
+            <button class="btn btn-primary btn-sm" onclick="openPinjamanModal()"><i class="ti ti-plus" aria-hidden="true"></i>Tambah pinjaman</button>
+          </div>
+          <div id="pinjamanList" class="loan-grid"></div>
         </div>
       </div>
 
@@ -516,6 +529,41 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeCatModal()">Batal</button>
       <button class="btn btn-primary" id="saveCatBtn" onclick="saveCategory()"><i class="ti ti-check" aria-hidden="true"></i>Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL PINJAMAN ================= -->
+<div class="modal-bg" id="pinjamanModalBg">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-building-bank i-brand" aria-hidden="true"></i>Pinjaman</div>
+    <div id="pinjamanMsg" class="error-msg"></div>
+    <div class="form-group">
+      <label class="form-label" for="pNama">Nama pinjaman</label>
+      <input class="form-control" type="text" id="pNama" placeholder="KPR Rumah, KTA Bank X, dll">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="pPokok">Pokok pinjaman (Rp)</label>
+      <input class="form-control" type="number" id="pPokok" placeholder="100000000" oninput="updatePinjamanPreview()">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="pBunga">Bunga per tahun (%)</label>
+        <input class="form-control" type="number" id="pBunga" placeholder="10.5" step="0.01" oninput="updatePinjamanPreview()">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="pTenor">Jangka waktu (bulan)</label>
+        <input class="form-control" type="number" id="pTenor" placeholder="36" oninput="updatePinjamanPreview()">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="pTglMulai">Tanggal mulai</label>
+      <input class="form-control" type="date" id="pTglMulai" oninput="updatePinjamanPreview()">
+    </div>
+    <div id="pinjamanPreview" class="preview preview-blue"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closePinjamanModal()">Batal</button>
+      <button class="btn btn-primary" id="savePinjamanBtn" onclick="savePinjaman()"><i class="ti ti-check" aria-hidden="true"></i>Simpan</button>
     </div>
   </div>
 </div>
