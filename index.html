@@ -115,39 +115,38 @@
 
         <div class="cards-grid" id="dashCards"></div>
 
-        <div class="grid-3">
+        <div class="grid-2">
           <div class="panel">
             <div class="panel-header">
-              <div class="panel-title"><i class="ti ti-chart-line i-brand" aria-hidden="true"></i> Arus keuangan per bulan</div>
+              <div class="panel-title"><i class="ti ti-arrow-up-right i-green" aria-hidden="true"></i> Pemasukan terbesar</div>
             </div>
-            <div class="chart-wrap"><canvas id="chartLine"></canvas></div>
-          </div>
-          <div>
-            <div class="panel">
-              <div class="panel-header">
-                <div class="panel-title"><i class="ti ti-arrow-up-right i-green" aria-hidden="true"></i> Pemasukan terbesar</div>
-              </div>
-              <div class="chart-wrap chart-wrap-sm"><canvas id="chartDoughnutIn"></canvas></div>
-              <div class="scroll-x">
-                <table class="tbl">
-                  <thead><tr><th>Kategori</th><th class="ta-r">Jumlah</th></tr></thead>
-                  <tbody id="topInTbl"></tbody>
-                </table>
-              </div>
-            </div>
-            <div class="panel">
-              <div class="panel-header">
-                <div class="panel-title"><i class="ti ti-flame i-red" aria-hidden="true"></i> Pengeluaran terbesar</div>
-              </div>
-              <div class="chart-wrap chart-wrap-sm"><canvas id="chartDoughnut"></canvas></div>
-              <div class="scroll-x">
-                <table class="tbl">
-                  <thead><tr><th>Kategori</th><th class="ta-r">Jumlah</th></tr></thead>
-                  <tbody id="topOutTbl"></tbody>
-                </table>
-              </div>
+            <div class="chart-wrap chart-wrap-sm"><canvas id="chartDoughnutIn"></canvas></div>
+            <div class="scroll-x">
+              <table class="tbl">
+                <thead><tr><th>Kategori</th><th class="ta-r">Jumlah</th></tr></thead>
+                <tbody id="topInTbl"></tbody>
+              </table>
             </div>
           </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title"><i class="ti ti-flame i-red" aria-hidden="true"></i> Pengeluaran terbesar</div>
+            </div>
+            <div class="chart-wrap chart-wrap-sm"><canvas id="chartDoughnut"></canvas></div>
+            <div class="scroll-x">
+              <table class="tbl">
+                <thead><tr><th>Kategori</th><th class="ta-r">Jumlah</th></tr></thead>
+                <tbody id="topOutTbl"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><i class="ti ti-chart-line i-brand" aria-hidden="true"></i> Arus keuangan per bulan</div>
+          </div>
+          <div class="chart-wrap"><canvas id="chartLine"></canvas></div>
         </div>
 
         <div class="panel">
