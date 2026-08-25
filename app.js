@@ -35,6 +35,7 @@ const RINCIAN_PAGE_SIZE=8;
 
 // State Pinjaman
 let pinjamanList=[],editPinjamanId=null;
+let pinjamanPembayaran=[];
 
 // ========== UTILS: HTML ESCAPING & SAFE RENDERING ==========
 // Escape HTML untuk mencegah XSS
@@ -122,7 +123,7 @@ async function handleLogout(){
     await sb.auth.signOut();
     document.getElementById('appPage').style.display='none';
     document.getElementById('loginPage').style.display='flex';
-    currentUser=null;categories=[];transactions=[];pinjamanList=[];
+    currentUser=null;categories=[];transactions=[];pinjamanList=[];pinjamanPembayaran=[];
   }catch(e){
     console.error('Logout error:',e);
   }
@@ -142,6 +143,7 @@ async function showApp(){
   await loadCategories();
   await loadTransactions();
   await loadPinjaman();
+  await loadPinjamanPembayaran();
   loadTheme();
   setPeriod(activePeriod);
   ['fBuyPrice','fCurPrice','fUnits'].forEach(id=>{
@@ -203,6 +205,15 @@ async function loadPinjaman(){
     pinjamanList=data||[];
   }catch(e){
     console.error('Load pinjaman error:',e);
+  }
+}
+async function loadPinjamanPembayaran(){
+  try{
+    const{data,error}=await sb.from('pinjaman_pembayaran').select('*').eq('user_id',currentUser.id);
+    if(error)throw error;
+    pinjamanPembayaran=data||[];
+  }catch(e){
+    console.error('Load pinjaman pembayaran error:',e);
   }
 }
 async function loadCategories(){
@@ -998,12 +1009,17 @@ function bulanBerjalan(tanggalMulai,n){
 function pinjamanStats(p){
   const n=p.jangka_waktu_bulan;
   const jadwal=buildJadwalAnuitas(Number(p.pokok),Number(p.bunga_persen_tahun),n);
-  const elapsed=bulanBerjalan(p.tanggal_mulai,n);
+  // Sumber kebenaran sisa pokok: jumlah pembayaran yang benar-benar tercatat
+  // di pinjaman_pembayaran, bukan lagi tanggal berjalan. bulanBerjalan() tetap
+  // dipakai, tapi sekarang hanya untuk mendeteksi keterlambatan (overdueBulan).
+  const bulanTerbayar=pinjamanPembayaran.filter(x=>x.pinjaman_id===p.id).length;
+  const elapsedByDate=bulanBerjalan(p.tanggal_mulai,n);
+  const overdueBulan=Math.max(0,elapsedByDate-bulanTerbayar);
   const angsuranPerBulan=jadwal[0]?jadwal[0].angsuran:0;
-  const sisaPokok=elapsed===0?Number(p.pokok):(jadwal[elapsed-1]?jadwal[elapsed-1].sisa:0);
-  const sisaBulan=n-elapsed;
-  const progress=n?Math.min(100,(elapsed/n)*100):0;
-  return{angsuranPerBulan,sisaPokok,sisaBulan,elapsed,progress};
+  const sisaPokok=bulanTerbayar===0?Number(p.pokok):(jadwal[bulanTerbayar-1]?jadwal[bulanTerbayar-1].sisa:0);
+  const sisaBulan=n-bulanTerbayar;
+  const progress=n?Math.min(100,(bulanTerbayar/n)*100):0;
+  return{angsuranPerBulan,sisaPokok,sisaBulan,bulanTerbayar,overdueBulan,progress};
 }
 function renderPinjaman(){
   const listEl=document.getElementById('pinjamanList');
@@ -1017,9 +1033,12 @@ function renderPinjaman(){
     totSisa+=s.sisaPokok;
     totAngsuran+=s.angsuranPerBulan;
     const lunas=s.sisaBulan<=0;
+    const bulanKeBerikutnya=Math.min(s.bulanTerbayar+1,p.jangka_waktu_bulan);
+    const badgeTerlambat=(!lunas&&s.overdueBulan>0)?` <span class="badge badge-red">Terlambat ${s.overdueBulan} bulan</span>`:'';
+    const tombolBayar=lunas?'':`<button class="btn btn-primary btn-sm btn-block" onclick="bayarAngsuranPinjaman('${p.id}')"><i class="ti ti-cash"></i> Bayar angsuran ke-${bulanKeBerikutnya}</button>`;
     return`<div class="loan-card${lunas?' loan-lunas':''}">
       <div class="loan-card-header">
-        <div class="loan-name"><i class="ti ti-building-bank"></i> ${escapeHtml(p.nama)}</div>
+        <div class="loan-name"><i class="ti ti-building-bank"></i> ${escapeHtml(p.nama)}${badgeTerlambat}</div>
         <div class="loan-actions">
           <button class="btn btn-ghost btn-sm" onclick="openPinjamanModal('${p.id}')"><i class="ti ti-edit"></i></button>
           <button class="btn btn-ghost btn-sm" onclick="deletePinjaman('${p.id}')"><i class="ti ti-trash"></i></button>
@@ -1031,7 +1050,8 @@ function renderPinjaman(){
         <div class="loan-stat"><span class="loan-stat-label">Sisa tenor</span><span class="loan-stat-value">${lunas?'Lunas':s.sisaBulan+' bulan'}</span></div>
       </div>
       <div class="progress-bar"><div class="progress-fill" style="width:${s.progress.toFixed(1)}%"></div></div>
-      <div class="loan-progress-label">${s.progress.toFixed(0)}% terbayar &middot; bulan ke-${s.elapsed} dari ${p.jangka_waktu_bulan}</div>
+      <div class="loan-progress-label">${s.bulanTerbayar} dari ${p.jangka_waktu_bulan} angsuran terbayar</div>
+      ${tombolBayar}
     </div>`;
   }).join('');
   listEl.innerHTML=cardsHtml||'<div class="empty"><i class="ti ti-inbox"></i>Belum ada pinjaman</div>';
@@ -1055,6 +1075,41 @@ function renderPinjaman(){
         <div class="card-value" style="color:var(--amber)">${fmt(totAngsuran)}</div>
       </div>
     </div>`;
+}
+async function bayarAngsuranPinjaman(pinjamanId){
+  const p=pinjamanList.find(x=>x.id===pinjamanId);
+  if(!p)return;
+  const n=p.jangka_waktu_bulan;
+  const bulanTerbayar=pinjamanPembayaran.filter(x=>x.pinjaman_id===p.id).length;
+  if(bulanTerbayar>=n){
+    alert('Pinjaman ini sudah lunas.');
+    return;
+  }
+  const jadwal=buildJadwalAnuitas(Number(p.pokok),Number(p.bunga_persen_tahun),n);
+  const bulanKe=bulanTerbayar+1;
+  const jumlah=jadwal[bulanKe-1]?jadwal[bulanKe-1].angsuran:0;
+  if(!confirm(`Catat pembayaran angsuran ke-${bulanKe} untuk "${p.nama}" sebesar ${fmt(jumlah)}?`))return;
+  const cat=categories.find(c=>c.type==='pengeluaran'&&c.name==='Cicilan Pinjaman');
+  if(!cat){
+    alert('Kategori "Cicilan Pinjaman" tidak ditemukan. Silakan buat kategori tersebut dulu di halaman Data kategori.');
+    return;
+  }
+  try{
+    const transPayload={date:today(),type:'pengeluaran',cat_id:cat.id,description:`Angsuran ke-${bulanKe} - ${p.nama}`,amount:jumlah,note:'',user_id:currentUser.id,meta:null};
+    const{data:transData,error:transError}=await sb.from('transactions').insert([transPayload]).select().single();
+    if(transError)throw transError;
+    const pembayaranPayload={pinjaman_id:p.id,user_id:currentUser.id,bulan_ke:bulanKe,tanggal_bayar:today(),jumlah,transaction_id:transData.id};
+    const{error:pembayaranError}=await sb.from('pinjaman_pembayaran').insert([pembayaranPayload]);
+    if(pembayaranError)throw pembayaranError;
+    await loadTransactions();
+    await loadPinjamanPembayaran();
+    renderDashboard();
+    renderTables();
+    renderPinjaman();
+  }catch(e){
+    console.error('Bayar angsuran error:',e);
+    alert('Gagal mencatat pembayaran: '+e.message);
+  }
 }
 function updatePinjamanPreview(){
   const preview=document.getElementById('pinjamanPreview');
