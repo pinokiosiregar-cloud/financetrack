@@ -884,43 +884,50 @@ function renderCharts(data){
   
   const topExp=topKategoriData('pengeluaran',data);
   if(doughnutChart){doughnutChart.destroy();doughnutChart=null;}
-  if(!chartKosong('chartDoughnut',!topExp.length,'Belum ada pengeluaran')){
-    doughnutChart=new Chart(document.getElementById('chartDoughnut'),{
-      type:'doughnut',
-      data:{labels:topExp.map(x=>x.name),datasets:[{data:topExp.map(x=>x.amount),backgroundColor:topExp.map(x=>x.color),borderWidth:2,borderColor:THEME.surface}]},
-      options:opsiDonut()
-    });
-  }
+  doughnutChart=renderDonutKategori(topExp,'chartDoughnut','Belum ada pengeluaran');
+  renderTopKategoriTbl(topExp,'topOutTbl','Belum ada pengeluaran');
 
   const topInc=topKategoriData('pemasukan',data);
   if(doughnutInChart){doughnutInChart.destroy();doughnutInChart=null;}
-  if(!chartKosong('chartDoughnutIn',!topInc.length,'Belum ada pemasukan')){
-    doughnutInChart=new Chart(document.getElementById('chartDoughnutIn'),{
-      type:'doughnut',
-      data:{labels:topInc.map(x=>x.name),datasets:[{data:topInc.map(x=>x.amount),backgroundColor:topInc.map(x=>x.color),borderWidth:2,borderColor:THEME.surface}]},
-      options:opsiDonut()
-    });
-  }
+  doughnutInChart=renderDonutKategori(topInc,'chartDoughnutIn','Belum ada pemasukan');
+  renderTopKategoriTbl(topInc,'topInTbl','Belum ada pemasukan');
 }
-// Kelompokkan transaksi per kategori untuk donut "kategori terbesar" (dipakai
-// untuk pemasukan & pengeluaran). Warna donut mengikuti warna kategori
-// (field `color` di tabel categories) supaya konsisten dengan cat-icon yang
-// dipakai di tabel-tabel lain.
+// Kelompokkan transaksi per kategori untuk rekap "kategori terbesar" (dipakai
+// untuk pemasukan & pengeluaran, ditampilkan sebagai donut + tabel). Simpan
+// objek kategori aslinya (bukan cuma nama) supaya ikon & warnanya konsisten
+// dengan cat-icon yang dipakai di tabel-tabel lain.
 function topKategoriData(type,data){
   const map={};
   data.filter(t=>t.type===type).forEach(t=>{
     const c=getCat(t.cat_id);
     const key=c?c.id:'lain';
-    if(!map[key])map[key]={name:c?c.name:'Lain',amount:0,color:catColor(c)};
+    if(!map[key])map[key]={cat:c||{name:'Lain',icon:'dots-circle-horizontal',color:null},amount:0};
     map[key].amount+=Number(t.amount);
   });
   return Object.values(map).sort((a,b)=>b.amount-a.amount).slice(0,5);
+}
+function renderDonutKategori(top,canvasId,msgKosong){
+  if(chartKosong(canvasId,!top.length,msgKosong))return null;
+  return new Chart(document.getElementById(canvasId),{
+    type:'doughnut',
+    data:{labels:top.map(x=>x.cat.name),datasets:[{data:top.map(x=>x.amount),backgroundColor:top.map(x=>catColor(x.cat)),borderWidth:2,borderColor:THEME.surface}]},
+    options:opsiDonut()
+  });
+}
+function renderTopKategoriTbl(top,tblId,msgKosong){
+  const tb=document.getElementById(tblId);
+  if(!tb)return;
+  tb.innerHTML=top.map(x=>`<tr>
+    <td><div class="cat-row">${catIcon(x.cat)}<span>${escapeHtml(x.cat.name)}</span></div></td>
+    <td class="ta-r">${fmt(x.amount)}</td>
+  </tr>`).join('');
+  if(!top.length)tb.innerHTML=`<tr><td colspan="2"><div class="empty"><i class="ti ti-inbox"></i>${msgKosong}</div></td></tr>`;
 }
 function opsiDonut(){
   return{
     responsive:true,maintainAspectRatio:false,cutout:'62%',
     plugins:{
-      legend:{position:'bottom',labels:{color:THEME.text2,usePointStyle:true,pointStyle:'circle',boxWidth:8,padding:12,font:{size:11}}},
+      legend:{display:false},
       tooltip:{callbacks:{label:c=>' '+c.label+': '+fmt(c.parsed)}}
     }
   };
