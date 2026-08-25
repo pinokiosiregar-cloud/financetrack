@@ -23,7 +23,7 @@ function loadTheme(){
 loadTheme();
 let categories=[],transactions=[],currentType='pemasukan',editId=null,currentUser=null;
 let activePeriod='month',activeInvFilter='semua';
-let lineChart=null,doughnutChart=null,catChart=null,inCatChart=null,invChart=null;
+let lineChart=null,doughnutChart=null,doughnutInChart=null,catChart=null,inCatChart=null,invChart=null;
 let selectedCoin=null,livePrices={};
 let isLoading=false;
 
@@ -882,25 +882,48 @@ function renderCharts(data){
     options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:true}},scales:{y:{beginAtZero:true}}}
   });
   
-  const expCats={};
-  data.filter(t=>t.type==='pengeluaran').forEach(t=>{
-    const c=getCat(t.cat_id);
-    const nm=c?c.name:'Lain';
-    expCats[nm]=(expCats[nm]||0)+Number(t.amount);
-  });
-  const topExp=Object.entries(expCats).sort((a,b)=>b[1]-a[1]).slice(0,5).map(e=>e[0]);
-  const topData=topExp.map(nm=>expCats[nm]);
+  const topExp=topKategoriData('pengeluaran',data);
   if(doughnutChart){doughnutChart.destroy();doughnutChart=null;}
-  if(chartKosong('chartDoughnut',!topExp.length,'Belum ada pengeluaran'))return;
-  doughnutChart=new Chart(document.getElementById('chartDoughnut'),{
-    type:'bar',
-    data:{labels:topExp,datasets:[{data:topData,backgroundColor:COLORS.red,borderRadius:5,barThickness:24}]},
-    options:{
-      indexAxis:'y',responsive:true,maintainAspectRatio:true,
-      plugins:{legend:{display:false}},
-      scales:{x:{display:true,beginAtZero:true,grid:{display:true,drawBorder:false}},y:{display:true,grid:{display:false,drawBorder:false}}}
-    }
+  if(!chartKosong('chartDoughnut',!topExp.length,'Belum ada pengeluaran')){
+    doughnutChart=new Chart(document.getElementById('chartDoughnut'),{
+      type:'doughnut',
+      data:{labels:topExp.map(x=>x.name),datasets:[{data:topExp.map(x=>x.amount),backgroundColor:topExp.map(x=>x.color),borderWidth:2,borderColor:THEME.surface}]},
+      options:opsiDonut()
+    });
+  }
+
+  const topInc=topKategoriData('pemasukan',data);
+  if(doughnutInChart){doughnutInChart.destroy();doughnutInChart=null;}
+  if(!chartKosong('chartDoughnutIn',!topInc.length,'Belum ada pemasukan')){
+    doughnutInChart=new Chart(document.getElementById('chartDoughnutIn'),{
+      type:'doughnut',
+      data:{labels:topInc.map(x=>x.name),datasets:[{data:topInc.map(x=>x.amount),backgroundColor:topInc.map(x=>x.color),borderWidth:2,borderColor:THEME.surface}]},
+      options:opsiDonut()
+    });
+  }
+}
+// Kelompokkan transaksi per kategori untuk donut "kategori terbesar" (dipakai
+// untuk pemasukan & pengeluaran). Warna donut mengikuti warna kategori
+// (field `color` di tabel categories) supaya konsisten dengan cat-icon yang
+// dipakai di tabel-tabel lain.
+function topKategoriData(type,data){
+  const map={};
+  data.filter(t=>t.type===type).forEach(t=>{
+    const c=getCat(t.cat_id);
+    const key=c?c.id:'lain';
+    if(!map[key])map[key]={name:c?c.name:'Lain',amount:0,color:catColor(c)};
+    map[key].amount+=Number(t.amount);
   });
+  return Object.values(map).sort((a,b)=>b.amount-a.amount).slice(0,5);
+}
+function opsiDonut(){
+  return{
+    responsive:true,maintainAspectRatio:false,cutout:'62%',
+    plugins:{
+      legend:{position:'bottom',labels:{color:THEME.text2,usePointStyle:true,pointStyle:'circle',boxWidth:8,padding:12,font:{size:11}}},
+      tooltip:{callbacks:{label:c=>' '+c.label+': '+fmt(c.parsed)}}
+    }
+  };
 }
 
 // ========== INVESTASI ==========
