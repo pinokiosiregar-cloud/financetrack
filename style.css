@@ -365,6 +365,9 @@ body{
    ===================================================================== */
 .chart-wrap{position:relative;height:300px;display:flex;align-items:center;justify-content:center;
   margin:var(--sp-4) 0}
+/* Dipakai untuk donut kategori (Pemasukan/Pengeluaran terbesar) yang berdampingan
+   secara vertikal di kolom sempit — lebih pendek dari chart-wrap standar. */
+.chart-wrap-sm{height:220px}
 
 /* =====================================================================
    TOMBOL
