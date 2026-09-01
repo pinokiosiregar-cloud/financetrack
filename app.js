@@ -1048,12 +1048,20 @@ function tanggalJatuhTempoAngsuran(tanggalMulai,bulanKe){
 function pinjamanStats(p){
   const n=p.jangka_waktu_bulan;
   const jadwal=buildJadwalAnuitas(Number(p.pokok),Number(p.bunga_persen_tahun),n);
-  // Sumber kebenaran sisa pokok: jumlah pembayaran yang benar-benar tercatat
-  // di pinjaman_pembayaran, bukan lagi tanggal berjalan. bulanBerjalan() tetap
-  // dipakai, tapi sekarang hanya untuk mendeteksi keterlambatan (overdueBulan).
-  const bulanTerbayar=pinjamanPembayaran.filter(x=>x.pinjaman_id===p.id).length;
   const elapsedByDate=bulanBerjalan(p.tanggal_mulai,n);
-  const overdueBulan=Math.max(0,elapsedByDate-bulanTerbayar);
+  let bulanTerbayar,overdueBulan;
+  if(p.auto_debit){
+    // Auto-debit: potong otomatis tiap bulan, dianggap selalu lancar —
+    // tidak butuh baris pinjaman_pembayaran, langsung ikut tanggal berjalan.
+    bulanTerbayar=elapsedByDate;
+    overdueBulan=0;
+  }else{
+    // Sumber kebenaran sisa pokok: jumlah pembayaran yang benar-benar tercatat
+    // di pinjaman_pembayaran, bukan lagi tanggal berjalan. bulanBerjalan() tetap
+    // dipakai, tapi sekarang hanya untuk mendeteksi keterlambatan (overdueBulan).
+    bulanTerbayar=pinjamanPembayaran.filter(x=>x.pinjaman_id===p.id).length;
+    overdueBulan=Math.max(0,elapsedByDate-bulanTerbayar);
+  }
   const angsuranPerBulan=jadwal[0]?jadwal[0].angsuran:0;
   const sisaPokok=bulanTerbayar===0?Number(p.pokok):(jadwal[bulanTerbayar-1]?jadwal[bulanTerbayar-1].sisa:0);
   const sisaBulan=n-bulanTerbayar;
@@ -1073,11 +1081,13 @@ function renderPinjaman(){
     totAngsuran+=s.angsuranPerBulan;
     const lunas=s.sisaBulan<=0;
     const bulanKeBerikutnya=Math.min(s.bulanTerbayar+1,p.jangka_waktu_bulan);
-    const badgeTerlambat=(!lunas&&s.overdueBulan>0)?` <span class="badge badge-red">Terlambat ${s.overdueBulan} bulan</span>`:'';
-    const tombolBayar=lunas?'':`<button class="btn btn-primary btn-sm btn-block" onclick="bayarAngsuranPinjaman('${p.id}')"><i class="ti ti-cash"></i> Bayar angsuran ke-${bulanKeBerikutnya}</button>`;
+    const badgeTerlambat=(!lunas&&!p.auto_debit&&s.overdueBulan>0)?` <span class="badge badge-red">Terlambat ${s.overdueBulan} bulan</span>`:'';
+    const badgeAutoDebit=p.auto_debit?` <span class="badge badge-blue">Auto-debit</span>`:'';
+    const labelTombol=s.overdueBulan>0?`Catat ${s.overdueBulan} angsuran tertunggak`:`Bayar angsuran ke-${bulanKeBerikutnya}`;
+    const tombolBayar=(lunas||p.auto_debit)?'':`<button class="btn btn-primary btn-sm btn-block" onclick="bayarAngsuranPinjaman('${p.id}')"><i class="ti ti-cash"></i> ${labelTombol}</button>`;
     return`<div class="loan-card${lunas?' loan-lunas':''}">
       <div class="loan-card-header">
-        <div class="loan-name"><i class="ti ti-building-bank"></i> ${escapeHtml(p.nama)}${badgeTerlambat}</div>
+        <div class="loan-name"><i class="ti ti-building-bank"></i> ${escapeHtml(p.nama)}${badgeAutoDebit}${badgeTerlambat}</div>
         <div class="loan-actions">
           <button class="btn btn-ghost btn-sm" onclick="openPinjamanModal('${p.id}')"><i class="ti ti-edit"></i></button>
           <button class="btn btn-ghost btn-sm" onclick="deletePinjaman('${p.id}')"><i class="ti ti-trash"></i></button>
@@ -1125,26 +1135,39 @@ async function bayarAngsuranPinjaman(pinjamanId){
     return;
   }
   const jadwal=buildJadwalAnuitas(Number(p.pokok),Number(p.bunga_persen_tahun),n);
-  const bulanKe=bulanTerbayar+1;
-  const jumlah=jadwal[bulanKe-1]?jadwal[bulanKe-1].angsuran:0;
-  // Kalau bulan ini sudah lewat jatuh tempo (mengejar tunggakan), catat di
-  // tanggal jatuh temponya sendiri supaya masuk laporan bulan yang benar.
-  // Kalau jatuh temponya belum tiba (bayar lebih awal), pakai hari ini.
-  const jatuhTempo=tanggalJatuhTempoAngsuran(p.tanggal_mulai,bulanKe);
-  const tanggalCatat=jatuhTempo<=today()?jatuhTempo:today();
-  if(!confirm(`Catat pembayaran angsuran ke-${bulanKe} untuk "${p.nama}" sebesar ${fmt(jumlah)} (tanggal ${tanggalCatat})?`))return;
+  // Kejar sampai bulan berjalan (kalau ada tunggakan), minimal 1 bulan
+  // (angsuran berikutnya) kalau tidak ada tunggakan sama sekali.
+  const elapsedByDate=bulanBerjalan(p.tanggal_mulai,n);
+  const bulanTujuan=Math.max(bulanTerbayar+1,Math.min(elapsedByDate,n));
+  const daftarBulan=[];
+  for(let b=bulanTerbayar+1;b<=bulanTujuan;b++)daftarBulan.push(b);
+  const totalJumlah=daftarBulan.reduce((s,b)=>s+(jadwal[b-1]?jadwal[b-1].angsuran:0),0);
+  const pesan=daftarBulan.length<=1
+    ?`Catat pembayaran angsuran ke-${daftarBulan[0]} untuk "${p.nama}" sebesar ${fmt(totalJumlah)}?`
+    :`Ada ${daftarBulan.length} angsuran tertunggak (ke-${daftarBulan[0]} s.d. ke-${daftarBulan[daftarBulan.length-1]}) untuk "${p.nama}", total ${fmt(totalJumlah)}. Catat semuanya sekaligus? Tiap bulan akan tercatat di tanggal jatuh temponya masing-masing.`;
+  if(!confirm(pesan))return;
   const cat=categories.find(c=>c.type==='pengeluaran'&&c.name==='Cicilan Pinjaman');
   if(!cat){
     alert('Kategori "Cicilan Pinjaman" tidak ditemukan. Silakan buat kategori tersebut dulu di halaman Data kategori.');
     return;
   }
   try{
-    const transPayload={date:tanggalCatat,type:'pengeluaran',cat_id:cat.id,description:`Angsuran ke-${bulanKe} - ${p.nama}`,amount:jumlah,note:'',user_id:currentUser.id,meta:null};
-    const{data:transData,error:transError}=await sb.from('transactions').insert([transPayload]).select().single();
-    if(transError)throw transError;
-    const pembayaranPayload={pinjaman_id:p.id,user_id:currentUser.id,bulan_ke:bulanKe,tanggal_bayar:tanggalCatat,jumlah,transaction_id:transData.id};
-    const{error:pembayaranError}=await sb.from('pinjaman_pembayaran').insert([pembayaranPayload]);
-    if(pembayaranError)throw pembayaranError;
+    // Insert satu-satu (bukan bulk insert) karena tiap pinjaman_pembayaran
+    // butuh transaction_id dari transaksi yang baru dibuat untuk bulan itu.
+    for(const bulanKe of daftarBulan){
+      const jumlah=jadwal[bulanKe-1]?jadwal[bulanKe-1].angsuran:0;
+      // Kalau bulan ini sudah lewat jatuh tempo (mengejar tunggakan), catat di
+      // tanggal jatuh temponya sendiri supaya masuk laporan bulan yang benar.
+      // Kalau jatuh temponya belum tiba (bayar lebih awal), pakai hari ini.
+      const jatuhTempo=tanggalJatuhTempoAngsuran(p.tanggal_mulai,bulanKe);
+      const tanggalCatat=jatuhTempo<=today()?jatuhTempo:today();
+      const transPayload={date:tanggalCatat,type:'pengeluaran',cat_id:cat.id,description:`Angsuran ke-${bulanKe} - ${p.nama}`,amount:jumlah,note:'',user_id:currentUser.id,meta:null};
+      const{data:transData,error:transError}=await sb.from('transactions').insert([transPayload]).select().single();
+      if(transError)throw transError;
+      const pembayaranPayload={pinjaman_id:p.id,user_id:currentUser.id,bulan_ke:bulanKe,tanggal_bayar:tanggalCatat,jumlah,transaction_id:transData.id};
+      const{error:pembayaranError}=await sb.from('pinjaman_pembayaran').insert([pembayaranPayload]);
+      if(pembayaranError)throw pembayaranError;
+    }
     await loadTransactions();
     await loadPinjamanPembayaran();
     renderDashboard();
@@ -1187,6 +1210,7 @@ function openPinjamanModal(id){
       document.getElementById('pBunga').value=p.bunga_persen_tahun;
       document.getElementById('pTenor').value=p.jangka_waktu_bulan;
       document.getElementById('pTglMulai').value=p.tanggal_mulai;
+      document.getElementById('pAutoDebit').checked=!!p.auto_debit;
     }
   }else{
     document.getElementById('pNama').value='';
@@ -1194,6 +1218,7 @@ function openPinjamanModal(id){
     document.getElementById('pBunga').value='';
     document.getElementById('pTenor').value='';
     document.getElementById('pTglMulai').value=today();
+    document.getElementById('pAutoDebit').checked=false;
   }
   updatePinjamanPreview();
   setLoading(false);
@@ -1210,6 +1235,7 @@ async function savePinjaman(){
   const bunga=parseFloat(document.getElementById('pBunga').value)||0;
   const tenor=parseInt(document.getElementById('pTenor').value);
   const tglMulai=document.getElementById('pTglMulai').value;
+  const autoDebit=document.getElementById('pAutoDebit').checked;
   const msg=document.getElementById('pinjamanMsg');
 
   if(!nama||!pokok||pokok<=0||!tenor||tenor<=0||!tglMulai){
@@ -1219,7 +1245,7 @@ async function savePinjaman(){
 
   setLoading(true);
   try{
-    const payload={nama,pokok,bunga_persen_tahun:bunga,jangka_waktu_bulan:tenor,tanggal_mulai:tglMulai,metode_bunga:'anuitas',user_id:currentUser.id};
+    const payload={nama,pokok,bunga_persen_tahun:bunga,jangka_waktu_bulan:tenor,tanggal_mulai:tglMulai,metode_bunga:'anuitas',auto_debit:autoDebit,user_id:currentUser.id};
     if(editPinjamanId){
       const{error}=await sb.from('pinjaman').update(payload).eq('id',editPinjamanId);
       if(error)throw error;
