@@ -1036,6 +1036,15 @@ function bulanBerjalan(tanggalMulai,n){
   if(now.getDate()<start.getDate())bulan-=1;
   return Math.max(0,Math.min(bulan,n));
 }
+// Tanggal jatuh tempo angsuran ke-bulanKe = tanggal_mulai + bulanKe bulan.
+// Dipakai supaya saat mengejar tunggakan (bayar beberapa bulan berturut-turut),
+// tiap transaksi tercatat di bulan yang sebenarnya, bukan semuanya hari ini.
+function tanggalJatuhTempoAngsuran(tanggalMulai,bulanKe){
+  const start=new Date(tanggalMulai+'T00:00:00');
+  const d=new Date(start.getFullYear(),start.getMonth()+bulanKe,start.getDate());
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
 function pinjamanStats(p){
   const n=p.jangka_waktu_bulan;
   const jadwal=buildJadwalAnuitas(Number(p.pokok),Number(p.bunga_persen_tahun),n);
@@ -1118,17 +1127,22 @@ async function bayarAngsuranPinjaman(pinjamanId){
   const jadwal=buildJadwalAnuitas(Number(p.pokok),Number(p.bunga_persen_tahun),n);
   const bulanKe=bulanTerbayar+1;
   const jumlah=jadwal[bulanKe-1]?jadwal[bulanKe-1].angsuran:0;
-  if(!confirm(`Catat pembayaran angsuran ke-${bulanKe} untuk "${p.nama}" sebesar ${fmt(jumlah)}?`))return;
+  // Kalau bulan ini sudah lewat jatuh tempo (mengejar tunggakan), catat di
+  // tanggal jatuh temponya sendiri supaya masuk laporan bulan yang benar.
+  // Kalau jatuh temponya belum tiba (bayar lebih awal), pakai hari ini.
+  const jatuhTempo=tanggalJatuhTempoAngsuran(p.tanggal_mulai,bulanKe);
+  const tanggalCatat=jatuhTempo<=today()?jatuhTempo:today();
+  if(!confirm(`Catat pembayaran angsuran ke-${bulanKe} untuk "${p.nama}" sebesar ${fmt(jumlah)} (tanggal ${tanggalCatat})?`))return;
   const cat=categories.find(c=>c.type==='pengeluaran'&&c.name==='Cicilan Pinjaman');
   if(!cat){
     alert('Kategori "Cicilan Pinjaman" tidak ditemukan. Silakan buat kategori tersebut dulu di halaman Data kategori.');
     return;
   }
   try{
-    const transPayload={date:today(),type:'pengeluaran',cat_id:cat.id,description:`Angsuran ke-${bulanKe} - ${p.nama}`,amount:jumlah,note:'',user_id:currentUser.id,meta:null};
+    const transPayload={date:tanggalCatat,type:'pengeluaran',cat_id:cat.id,description:`Angsuran ke-${bulanKe} - ${p.nama}`,amount:jumlah,note:'',user_id:currentUser.id,meta:null};
     const{data:transData,error:transError}=await sb.from('transactions').insert([transPayload]).select().single();
     if(transError)throw transError;
-    const pembayaranPayload={pinjaman_id:p.id,user_id:currentUser.id,bulan_ke:bulanKe,tanggal_bayar:today(),jumlah,transaction_id:transData.id};
+    const pembayaranPayload={pinjaman_id:p.id,user_id:currentUser.id,bulan_ke:bulanKe,tanggal_bayar:tanggalCatat,jumlah,transaction_id:transData.id};
     const{error:pembayaranError}=await sb.from('pinjaman_pembayaran').insert([pembayaranPayload]);
     if(pembayaranError)throw pembayaranError;
     await loadTransactions();
