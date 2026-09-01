@@ -579,6 +579,13 @@
       <label class="form-label" for="pTglMulai">Tanggal mulai</label>
       <input class="form-control" type="date" id="pTglMulai" oninput="updatePinjamanPreview()">
     </div>
+    <div class="form-group">
+      <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
+        <input type="checkbox" id="pAutoDebit">
+        Auto-debit (potong otomatis tiap bulan, selalu dianggap lancar)
+      </label>
+      <div style="margin-top:4px;font-size:12px;color:var(--text-3)">Kalau dicentang, sisa pokok dihitung langsung dari tanggal mulai — tidak perlu catat pembayaran manual, tombol "Bayar angsuran" disembunyikan.</div>
+    </div>
     <div id="pinjamanPreview" class="preview preview-blue"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closePinjamanModal()">Batal</button>
